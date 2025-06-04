@@ -1,24 +1,28 @@
-[project]
+[tool.poetry]
 name = "technical-analyst"
 version = "0.1.0"
 description = "A TA Bot"
-package-mode = false
-authors = [
-    {name = "User"}
-]
+authors = ["User"]
 readme = "README.md"
-requires-python = "^3.13"
-dependencies = [
-    "streamlit (>=1.45.1,<2.0.0)",
-    "yfinance (>=0.2.61,<0.3.0)",
-    "plotly (>=6.1.2,<7.0.0)",
-    "google-generativeai (>=0.8.5,<0.9.0)",
-    "kaleido (==0.2.1)",
-    "groq (>=0.26.0,<0.27.0)",
-    "plotly-express (>=0.4.1,<0.5.0)"
-]
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+streamlit = ">=1.45.1,<2.0.0"
+yfinance = ">=0.2.61,<0.3.0"
+numpy = ">=1.24.0,<=2.2.6"
+plotly = ">=6.1.2,<7.0.0"
+kaleido = "==0.2.1"
+groq = ">=0.26.0,<0.27.0"
+plotly-express = ">=0.4.1,<0.5.0"
+python-dotenv = ">=1.0.0,<2.0.0"
+tenacity = "^9.1.2"
+httpx = "^0.28.1"
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+app = "app:main"
