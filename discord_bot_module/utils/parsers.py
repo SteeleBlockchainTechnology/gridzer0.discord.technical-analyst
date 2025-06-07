@@ -15,6 +15,12 @@ def parse_comma_separated_string(value: str) -> List[str]:
         return []
     return [item.strip().upper() for item in value.split(",") if item.strip()]
 
+def parse_indicators_string(value: str) -> List[str]:
+    """Parse comma-separated indicators string preserving case."""
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
 def parse_date_string(date_str: str) -> Optional[datetime]:
     """Parse date string in YYYY-MM-DD format."""
     try:

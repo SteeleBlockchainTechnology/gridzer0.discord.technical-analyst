@@ -12,9 +12,16 @@ logger = setup_logger("DiscordValidators")
 def validate_indicators(indicators: List[str]) -> List[str]:
     """Validate and return only supported indicators."""
     valid_indicators = []
+    # Create a case-insensitive lookup
+    indicator_lookup = {ind.upper(): ind for ind in settings.TECHNICAL_INDICATORS}
+    
     for indicator in indicators:
+        # Try exact match first
         if indicator in settings.TECHNICAL_INDICATORS:
             valid_indicators.append(indicator)
+        # Then try case-insensitive match
+        elif indicator.upper() in indicator_lookup:
+            valid_indicators.append(indicator_lookup[indicator.upper()])
         else:
             logger.warning(f"Unsupported indicator: {indicator}")
     return valid_indicators

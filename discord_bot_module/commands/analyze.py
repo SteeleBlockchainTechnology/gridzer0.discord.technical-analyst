@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from .base import BaseCommand
-from ..utils.parsers import parse_comma_separated_string, parse_date_string
+from ..utils.parsers import parse_comma_separated_string, parse_date_string, parse_indicators_string
 from ..utils.validators import validate_indicators
 from ..embeds.analysis_embeds import create_analysis_embed, create_error_embed, create_summary_embed
 from src.config.settings import settings
@@ -147,9 +147,8 @@ async def analyze_command(
         else:
             # Default to today
             parsed_end_date = datetime.now()
-        
-        # Parse and validate indicators
-        indicator_list = parse_comma_separated_string(indicators)
+          # Parse and validate indicators
+        indicator_list = parse_indicators_string(indicators)
         valid_indicators = validate_indicators(indicator_list)
         
         if not valid_indicators:
