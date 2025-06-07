@@ -43,6 +43,10 @@ class MarketDataService:
             logger.error(f"Error fetching data for {ticker}: {str(e)}")
             return None
     
+    def fetch_data(self, ticker, start_date, end_date):
+        """Alias for get_ticker_data to maintain consistency with Discord bot."""
+        return self.get_ticker_data(ticker, start_date, end_date)
+    
     def get_multiple_tickers_data(self, tickers, start_date, end_date):
         """
         Fetch data for multiple tickers.

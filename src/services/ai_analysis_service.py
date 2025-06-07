@@ -102,8 +102,7 @@ class AIAnalysisService:
             if mapped_key in required_fields:
                 result[mapped_key] = str(value)
         
-        return result
-
+        return result    
     def analyze_market_data(self, ticker, data_description):
         """Analyze market data using Groq AI."""
         if not self.is_initialized():
@@ -153,8 +152,7 @@ class AIAnalysisService:
             else:
                 # Apply reformatting immediately to ensure correct fields
                 result['justification'] = self._reformat_justification(result['justification'])
-            
-            logger.debug(f"Final result: {json.dumps(result, indent=2)}")
+                logger.debug(f"Final result: {json.dumps(result, indent=2)}")
             return result
                 
         except json.JSONDecodeError as e:
@@ -172,3 +170,61 @@ class AIAnalysisService:
                 "action": "Error",
                 "justification": self._reformat_justification({})
             }
+    
+    def analyze_stock_data(self, data, ticker, indicators):
+        """Analyze stock data - alias for Discord bot compatibility."""
+        # Generate data description from pandas DataFrame
+        technical_summary = self._generate_data_description(data, ticker, indicators)
+        return self.analyze_market_data(ticker, technical_summary)
+    
+    def _generate_data_description(self, data, ticker, indicators):
+        """Generate data description from pandas DataFrame for AI analysis."""
+        try:
+            from ..config.settings import settings
+            
+            # Check if this is likely a cryptocurrency
+            is_crypto = ticker in settings.CRYPTO_SYMBOLS
+            
+            # Format large numbers with commas for readability
+            current_price = data['Close'].iloc[-1]
+            formatted_price = f"${current_price:,.2f}"
+            price_change = data['Close'].iloc[-1] - data['Close'].iloc[0]
+            formatted_change = f"${price_change:,.2f}"
+            pct_change = ((data['Close'].iloc[-1] / data['Close'].iloc[0]) - 1) * 100
+            high_price = f"${data['High'].max():,.2f}"
+            low_price = f"${data['Low'].min():,.2f}"
+            
+            # Create comprehensive description
+            data_description = f"""
+            {'Cryptocurrency' if is_crypto else 'Stock'}: {ticker}{'-USD' if is_crypto else ''}
+            Date Range: {data.index[0].strftime('%Y-%m-%d')} to {data.index[-1].strftime('%Y-%m-%d')}
+            Current Price: {formatted_price}
+            Price Change: {formatted_change} ({pct_change:.2f}%)
+            52-week High: {high_price}
+            52-week Low: {low_price}
+            Volume: {data['Volume'].iloc[-1]:,}
+            """
+            
+            # Add technical indicator data to description
+            for ind in indicators:
+                if ind == "20-Day SMA":
+                    sma_value = data['Close'].rolling(window=20).mean().iloc[-1]
+                    data_description += f"\n20-Day SMA: ${sma_value:.2f}"
+                elif ind == "20-Day EMA":
+                    ema_value = data['Close'].ewm(span=20).mean().iloc[-1]
+                    data_description += f"\n20-Day EMA: ${ema_value:.2f}"
+                elif ind == "20-Day Bollinger Bands":
+                    sma = data['Close'].rolling(window=20).mean().iloc[-1]
+                    std = data['Close'].rolling(window=20).std().iloc[-1]
+                    bb_upper = sma + 2 * std
+                    bb_lower = sma - 2 * std
+                    data_description += f"\nBollinger Bands: Upper=${bb_upper:.2f}, Middle=${sma:.2f}, Lower=${bb_lower:.2f}"
+                elif ind == "VWAP":
+                    vwap_value = (data['Close'] * data['Volume']).sum() / data['Volume'].sum()
+                    data_description += f"\nVWAP: ${vwap_value:.2f}"
+            
+            return data_description
+            
+        except Exception as e:
+            logger.error(f"Error generating data description: {str(e)}")
+            return f"Error generating data description for {ticker}"

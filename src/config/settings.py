@@ -10,7 +10,11 @@ load_dotenv()
 
 class Settings:
     """Application settings loaded from environment variables."""
-      # API Keys
+    # Discord Bot Settings
+    DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
+    DISCORD_STATUS = os.getenv("DISCORD_STATUS", "for /analyze commands")
+    
+    # API Keys
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     
     # Model Settings

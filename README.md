@@ -1,18 +1,19 @@
 # Technical Analysis Agent
 
-A modular Streamlit application that provides technical analysis for stocks and cryptocurrencies using yfinance for data fetching and Groq AI for advanced analysis.
+A comprehensive technical analysis application that provides multiple interfaces for analyzing stocks and cryptocurrencies. Features include a Discord bot for real-time analysis, CLI interface for terminal users, and modular architecture for easy extension.
 
 ## Features
 
-- Real-time stock and cryptocurrency data using Yahoo Finance API
-- Technical indicators including:
+- **Multiple Interfaces**: Discord bot, CLI, and extensible architecture
+- **Real-time Data**: Stock and cryptocurrency data using Yahoo Finance API
+- **Technical Indicators**:
   - Simple Moving Average (SMA)
   - Exponential Moving Average (EMA)
   - Bollinger Bands
   - Volume Weighted Average Price (VWAP)
-- Interactive candlestick charts with Plotly
-- AI-powered market analysis and recommendations using Groq API
-- Clean, modular architecture following best practices
+- **Interactive Charts**: Candlestick charts with Plotly
+- **AI Analysis**: Powered by Groq API for intelligent market insights
+- **Modular Design**: Clean, maintainable, and extensible architecture
 
 ## Project Structure
 
@@ -20,21 +21,23 @@ A modular Streamlit application that provides technical analysis for stocks and 
 .
 ├── .env                 # Environment variables (API keys, etc.)
 ├── .gitignore           # Git ignore file
-├── app.py               # Main application entry point
+├── main.py              # Main application entry point
 ├── logs/                # Directory for application logs
-├── main.py              # Original single-file application (legacy)
 ├── pyproject.toml       # Project dependencies and metadata
-├── src/                 # Source code directory
-│   ├── components/      # UI components
-│   │   ├── analysis_display.py  # Analysis display components
-│   │   └── sidebar.py   # Sidebar configuration components
+├── discord_bot_module/  # Discord bot implementation
+│   ├── bot/             # Core bot functionality
+│   ├── commands/        # Slash commands
+│   ├── embeds/          # Discord embed creation
+│   ├── handlers/        # Interaction handlers
+│   └── utils/           # Discord-specific utilities
+├── src/                 # Core source code directory
 │   ├── config/          # Configuration settings
 │   │   └── settings.py  # Application settings
-│   ├── models/          # Data models (if needed)
+│   ├── models/          # Data models
 │   ├── services/        # Business logic services
-│   │   ├── ai_analysis_service.py   # AI analysis using Groq API
-│   │   ├── market_data_service.py   # Market data fetching with yfinance
-│   │   └── technical_analysis_service.py  # Technical indicator calculations
+│   │   ├── ai_analysis_service.py     # AI analysis using Groq API
+│   │   ├── market_data_service.py     # Market data fetching
+│   │   └── technical_analysis_service.py  # Technical indicators
 │   └── utils/           # Utility functions
 │       └── logging_utils.py  # Logging configuration
 ```
@@ -43,16 +46,24 @@ A modular Streamlit application that provides technical analysis for stocks and 
 
 1. Clone the repository:
 
+````bash
+git clone <repository-url>
+## Installation
+
+1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd technical-analysis-agent
-```
+````
 
 2. Set up environment variables by creating an `.env` file:
 
 ```
 GROQ_API_KEY=your_groq_api_key
+DISCORD_TOKEN=your_discord_bot_token
 MODEL_NAME=meta-llama/llama-4-maverick-17b-128e-instruct
+DISCORD_STATUS=Technical Analysis
 LOGS_DIR=logs
 LOG_FILE=technical_analysis_app.log
 LOG_LEVEL=DEBUG
@@ -72,17 +83,60 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Run the application:
+The application supports multiple modes of operation through the main.py entry point:
+
+### Discord Bot Mode
+
+Run the Discord bot for real-time technical analysis in Discord servers:
 
 ```bash
-poetry run streamlit run app.py
+poetry run python main.py discord
 ```
+
+With environment validation:
+
+```bash
+poetry run python main.py discord --validate
+```
+
+### CLI Mode
+
+Interactive command-line interface for terminal users:
+
+```bash
+poetry run python main.py cli
+```
+
+Features:
+
+- Analyze individual tickers
+- List available technical indicators
+- Save charts to HTML files
+- AI-powered analysis
+
+### Test Mode
+
+Run the application test suite:
+
+```bash
+poetry run python main.py test
+```
+
+### Help
+
+View all available options:
+
+```bash
+poetry run python main.py --help
+```
+
+````
 
 Or
 
 ```bash
 streamlit run app.py
-```
+````
 
 2. Enter stock or cryptocurrency tickers in the sidebar (comma-separated)
 3. Set the date range for analysis

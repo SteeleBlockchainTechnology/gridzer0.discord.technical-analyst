@@ -1,5 +1,6 @@
 import pandas as pd
 import plotly.graph_objects as go
+import io
 from ..utils.logging_utils import setup_logger
 
 # Set up logger for this module
@@ -193,9 +194,202 @@ class TechnicalAnalysisService:
                 elif ind == "VWAP":
                     vwap_value = self.calculate_vwap(data).iloc[-1]
                     data_description += f"\nVWAP: ${vwap_value:.2f}"
-            
-            return data_description
+                return data_description
             
         except Exception as e:
             logger.error(f"Error generating technical data summary: {str(e)}")
             return f"Error generating technical data for {ticker}"
+    
+    def export_chart_as_image(self, fig, width=1200, height=800):
+        """Export Plotly figure as PNG image bytes using PIL as primary generator."""
+        logger.debug("Exporting chart as PNG image using PIL")
+        
+        try:
+            # First try to get the figure as HTML and convert to image using PIL
+            return self._create_chart_image_with_pil(fig, width, height)
+            
+        except Exception as e:
+            logger.error(f"PIL chart generation failed: {e}")
+            # Create fallback image
+            return self._create_fallback_image(width, height)
+    
+    def _create_chart_image_with_pil(self, fig, width=800, height=600):
+        """Create chart image using PIL from Plotly figure data."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            import numpy as np
+            
+            logger.debug(f"Creating chart image with PIL ({width}x{height})")
+            
+            # Create a white background
+            img = Image.new('RGB', (width, height), color='white')
+            draw = ImageDraw.Draw(img)
+            
+            # Try to use a default font
+            try:
+                title_font = ImageFont.truetype("arial.ttf", 16)
+                text_font = ImageFont.truetype("arial.ttf", 12)
+            except:
+                title_font = ImageFont.load_default()
+                text_font = ImageFont.load_default()
+            
+            # Get the first candlestick trace (should be the main data)
+            candlestick_data = None
+            for trace in fig.data:
+                if hasattr(trace, 'open') and hasattr(trace, 'high'):
+                    candlestick_data = trace
+                    break
+            
+            if candlestick_data:
+                # Extract OHLC data
+                dates = candlestick_data.x
+                opens = candlestick_data.open
+                highs = candlestick_data.high
+                lows = candlestick_data.low
+                closes = candlestick_data.close
+                
+                # Calculate chart area (leave margins for title and labels)
+                margin_top = 50
+                margin_bottom = 50
+                margin_left = 80
+                margin_right = 50
+                
+                chart_width = width - margin_left - margin_right
+                chart_height = height - margin_top - margin_bottom
+                
+                # Find price range
+                all_prices = list(highs) + list(lows)
+                min_price = min(all_prices)
+                max_price = max(all_prices)
+                price_range = max_price - min_price
+                
+                if price_range == 0:
+                    price_range = 1  # Avoid division by zero
+                
+                # Draw title
+                title = fig.layout.title.text if fig.layout.title else "Price Chart"
+                title_bbox = draw.textbbox((0, 0), title, font=title_font)
+                title_width = title_bbox[2] - title_bbox[0]
+                title_x = (width - title_width) // 2
+                draw.text((title_x, 10), title, fill='black', font=title_font)
+                
+                # Draw chart border
+                chart_x1 = margin_left
+                chart_y1 = margin_top
+                chart_x2 = margin_left + chart_width
+                chart_y2 = margin_top + chart_height
+                draw.rectangle([chart_x1, chart_y1, chart_x2, chart_y2], outline='black', width=1)
+                
+                # Draw candlesticks (simplified as rectangles)
+                num_candles = len(closes)
+                if num_candles > 0:
+                    candle_width = max(1, chart_width // (num_candles * 2))
+                    
+                    for i in range(num_candles):
+                        if i >= len(opens) or i >= len(closes):
+                            continue
+                            
+                        open_price = opens[i]
+                        close_price = closes[i]
+                        high_price = highs[i]
+                        low_price = lows[i]
+                        
+                        if any(pd.isna([open_price, close_price, high_price, low_price])):
+                            continue
+                        
+                        # Calculate positions
+                        x = margin_left + (i * chart_width // num_candles)
+                        
+                        # Normalize prices to chart coordinates
+                        open_y = margin_top + chart_height - int(((open_price - min_price) / price_range) * chart_height)
+                        close_y = margin_top + chart_height - int(((close_price - min_price) / price_range) * chart_height)
+                        high_y = margin_top + chart_height - int(((high_price - min_price) / price_range) * chart_height)
+                        low_y = margin_top + chart_height - int(((low_price - min_price) / price_range) * chart_height)
+                        
+                        # Choose color (green for up, red for down)
+                        color = 'green' if close_price >= open_price else 'red'
+                        
+                        # Draw high-low line
+                        draw.line([(x + candle_width//2, high_y), (x + candle_width//2, low_y)], fill='black', width=1)
+                        
+                        # Draw body rectangle
+                        body_top = min(open_y, close_y)
+                        body_bottom = max(open_y, close_y)
+                        draw.rectangle([x, body_top, x + candle_width, body_bottom], fill=color, outline='black')
+                
+                # Add price labels on Y-axis
+                num_labels = 5
+                for i in range(num_labels + 1):
+                    price = min_price + (price_range * i / num_labels)
+                    y = margin_top + chart_height - int((i / num_labels) * chart_height)
+                    price_text = f"${price:.2f}"
+                    draw.text((5, y-6), price_text, fill='black', font=text_font)
+                
+                # Add technical indicators note
+                if fig.data and len(fig.data) > 1:
+                    indicators_text = f"Chart includes {len(fig.data)-1} technical indicators"
+                    draw.text((margin_left, height-30), indicators_text, fill='blue', font=text_font)
+            
+            else:
+                # No candlestick data found, create a simple placeholder
+                text = "Chart Data Processing\nTechnical Analysis Available"
+                text_bbox = draw.textbbox((0, 0), text, font=title_font)
+                text_width = text_bbox[2] - text_bbox[0]
+                text_height = text_bbox[3] - text_bbox[1]
+                
+                x = (width - text_width) // 2
+                y = (height - text_height) // 2
+                
+                draw.text((x, y), text, fill='black', font=title_font)
+            
+            # Convert to bytes
+            img_buffer = io.BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+            
+            logger.debug("PIL chart image created successfully")
+            return img_buffer
+            
+        except Exception as e:
+            logger.error(f"Failed to create PIL chart image: {e}")
+            raise
+
+    def _create_fallback_image(self, width=800, height=600):
+        """Create a fallback image when Plotly export fails."""
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            logger.debug("Creating fallback image with PIL")
+            
+            # Create a simple image with text
+            img = Image.new('RGB', (width, height), color='white')
+            draw = ImageDraw.Draw(img)
+            
+            # Try to use a default font
+            try:
+                font = ImageFont.truetype("arial.ttf", 20)
+            except:
+                font = ImageFont.load_default()
+            
+            # Draw text
+            text = "Chart Export Failed\nUsing Fallback Image\nTechnical Analysis Available in Text"
+            text_bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            
+            x = (width - text_width) // 2
+            y = (height - text_height) // 2
+            
+            draw.text((x, y), text, fill='black', font=font)
+            
+            # Convert to bytes
+            img_buffer = io.BytesIO()
+            img.save(img_buffer, format='PNG')
+            img_buffer.seek(0)
+            
+            logger.debug("Fallback image created successfully")
+            return img_buffer
+            
+        except Exception as e:
+            logger.error(f"Failed to create fallback image: {e}")
+            return None

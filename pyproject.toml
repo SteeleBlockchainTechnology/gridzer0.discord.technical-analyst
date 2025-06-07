@@ -12,12 +12,14 @@ streamlit = ">=1.45.1,<2.0.0"
 yfinance = ">=0.2.61,<0.3.0"
 numpy = ">=1.24.0,<=2.2.6"
 plotly = ">=6.1.2,<7.0.0"
-kaleido = "==0.2.1"
 groq = ">=0.26.0,<0.27.0"
 plotly-express = ">=0.4.1,<0.5.0"
 python-dotenv = ">=1.0.0,<2.0.0"
 tenacity = "^9.1.2"
 httpx = "^0.28.1"
+"discord.py" = ">=2.3.0,<3.0.0"
+aiofiles = ">=23.0.0,<24.0.0"
+pillow = ">=10.0.0,<11.0.0"
 
 
 [build-system]
@@ -26,3 +28,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 app = "app:main"
+discord-bot = "discord_bot:main"
