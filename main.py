@@ -16,6 +16,7 @@ Usage:
     python main.py --help               # Show help
 """
 
+import datetime
 import sys
 import argparse
 import logging
@@ -137,7 +138,7 @@ class TechnicalAnalysisAgent:
                 days_back = 365
             
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=days_back)
+            start_date = end_date - datetime.timedelta(days=days_back)
             
             # Get indicators
             print(f"\nAvailable indicators: {', '.join(settings.TECHNICAL_INDICATORS)}")
