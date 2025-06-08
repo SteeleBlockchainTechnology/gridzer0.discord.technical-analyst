@@ -1,3 +1,0 @@
-"""
-Embeds module initialization.
-"""

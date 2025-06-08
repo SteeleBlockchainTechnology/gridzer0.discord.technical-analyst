@@ -47,20 +47,16 @@ class TechnicalAnalysisAgent:
         """Run the Discord bot."""
         try:
             self.logger.info("Starting Discord bot mode...")
-            
-            # Import Discord bot module
-            from discord_bot_module.bot.bot import create_bot
-            from discord_bot_module.bot.events import setup_events
+              # Import Discord bot module
+            from discord_bot.bot import create_bot
             
             # Validate Discord token
             if not settings.DISCORD_TOKEN:
                 self.logger.error("DISCORD_TOKEN not found in environment variables")
                 self.logger.error("Please set DISCORD_TOKEN in your .env file")
                 return False
-            
-            # Create and configure bot
+              # Create and configure bot
             bot = create_bot()
-            setup_events(bot)
             
             # Run the bot
             self.logger.info("Discord bot starting...")
