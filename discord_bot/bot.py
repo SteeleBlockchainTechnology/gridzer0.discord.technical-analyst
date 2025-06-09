@@ -14,6 +14,7 @@ import io
 from src.config.settings import settings
 from src.services.market_data_service import MarketDataService
 from src.services.technical_analysis_service import TechnicalAnalysisService
+from src.services.chart_image_service import ChartImageService
 from src.services.ai_analysis_service import AIAnalysisService
 from src.utils.logging_utils import setup_logger
 
@@ -35,10 +36,10 @@ class TechnicalAnalysisBot(commands.Bot):
             intents=intents,
             help_command=None
         )
-        
-        # Initialize services
+          # Initialize services
         self.market_data_service = MarketDataService()
         self.technical_analysis_service = TechnicalAnalysisService()
+        self.chart_image_service = ChartImageService()
         self.ai_analysis_service = AIAnalysisService()
         
     async def setup_hook(self):
@@ -154,9 +155,8 @@ async def analyze_command(
                         fig = bot.technical_analysis_service.create_candlestick_chart(
                             data, ticker, indicators
                         )
-                        
-                        # Export chart as image
-                        img_buffer = bot.technical_analysis_service.export_chart_as_image(fig)
+                          # Export chart as image
+                        img_buffer = bot.chart_image_service.export_chart_as_image(fig)
                         
                         if img_buffer:
                             # Create Discord file

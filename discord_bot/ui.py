@@ -3,7 +3,7 @@ Interactive UI Components for Discord Bot
 """
 import discord
 from typing import List, Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from src.config.settings import settings
 from src.utils.logging_utils import setup_logger
@@ -17,22 +17,31 @@ class DateRangeModal(discord.ui.Modal, title="Set Date Range"):
     def __init__(self, view):
         super().__init__()
         self.parent_view = view
-    
-    start_date = discord.ui.TextInput(
-        label="Start Date",
-        placeholder="Enter start date (YYYY-MM-DD), e.g., 2024-01-01",
-        default="2024-01-01",
-        max_length=10,
-        required=True
-    )
-    
-    end_date = discord.ui.TextInput(
-        label="End Date", 
-        placeholder="Enter end date (YYYY-MM-DD), e.g., 2024-12-31",
-        default="2024-12-31",
-        max_length=10,
-        required=True
-    )
+        
+        # Calculate dynamic default dates
+        today = datetime.now()
+        one_year_ago = today - timedelta(days=364)
+        
+        # Create text inputs with dynamic defaults
+        self.start_date = discord.ui.TextInput(
+            label="Start Date",
+            placeholder=f"Enter start date (YYYY-MM-DD), e.g., {one_year_ago.strftime('%Y-%m-%d')}",
+            default=one_year_ago.strftime('%Y-%m-%d'),
+            max_length=10,
+            required=True
+        )
+        
+        self.end_date = discord.ui.TextInput(
+            label="End Date", 
+            placeholder=f"Enter end date (YYYY-MM-DD), e.g., {today.strftime('%Y-%m-%d')}",
+            default=today.strftime('%Y-%m-%d'),
+            max_length=10,
+            required=True
+        )
+        
+        # Add the text inputs to the modal
+        self.add_item(self.start_date)
+        self.add_item(self.end_date)
     
     async def on_submit(self, interaction: discord.Interaction):
         """Handle date range submission."""
