@@ -71,8 +71,7 @@ class TechnicalAnalysisService:
             # Add selected indicators if provided
             if indicators:
                 self.add_indicators_to_chart(fig, data, indicators)
-            
-            # Configure chart layout
+              # Configure chart layout
             fig.update_layout(
                 title=f"{ticker} Price Chart",
                 xaxis_title="Date",
@@ -87,7 +86,6 @@ class TechnicalAnalysisService:
             return go.Figure()  # Return empty figure on error
     
     def add_indicators_to_chart(self, fig, data, indicators):
-       
         """Add technical indicators to an existing chart."""
 
         for indicator in indicators:
@@ -114,7 +112,7 @@ class TechnicalAnalysisService:
                         line=dict(color='orange')
                     ))
                     
-                elif indicator == "20-Day Bollinger Bands":
+                elif indicator == "Bollinger Bands":
                     bb_upper, bb_middle, bb_lower = self.calculate_bollinger_bands(data, 20, 2)
                     fig.add_trace(go.Scatter(
                         x=data.index, 
@@ -176,8 +174,7 @@ class TechnicalAnalysisService:
             52-week Low: {low_price}
             Volume: {data['Volume'].iloc[-1]:,}
             """
-            
-            # Add technical indicator data to description
+              # Add technical indicator data to description
             for ind in indicators:
                 if ind == "20-Day SMA":
                     sma_value = self.calculate_sma(data, 20).iloc[-1]
@@ -185,7 +182,7 @@ class TechnicalAnalysisService:
                 elif ind == "20-Day EMA":
                     ema_value = self.calculate_ema(data, 20).iloc[-1]
                     data_description += f"\n20-Day EMA: ${ema_value:.2f}"
-                elif ind == "20-Day Bollinger Bands":
+                elif ind == "Bollinger Bands":
                     _, sma, _ = self.calculate_bollinger_bands(data, 20, 2)
                     std = data['Close'].rolling(window=20).std().iloc[-1]
                     bb_upper = sma.iloc[-1] + 2 * std
@@ -194,7 +191,8 @@ class TechnicalAnalysisService:
                 elif ind == "VWAP":
                     vwap_value = self.calculate_vwap(data).iloc[-1]
                     data_description += f"\nVWAP: ${vwap_value:.2f}"
-                return data_description
+            
+            return data_description
             
         except Exception as e:
             logger.error(f"Error generating technical data summary: {str(e)}")
@@ -324,11 +322,38 @@ class TechnicalAnalysisService:
                     y = margin_top + chart_height - int((i / num_labels) * chart_height)
                     price_text = f"${price:.2f}"
                     draw.text((5, y-6), price_text, fill='black', font=text_font)
-                
-                # Add technical indicators note
-                if fig.data and len(fig.data) > 1:
-                    indicators_text = f"Chart includes {len(fig.data)-1} technical indicators"
-                    draw.text((margin_left, height-30), indicators_text, fill='blue', font=text_font)
+                  # Add technical indicators note
+                indicator_traces = [trace for trace in fig.data if hasattr(trace, 'mode') and trace.mode == 'lines']
+                if indicator_traces:
+                    indicators_text = f"Chart includes {len(indicator_traces)} technical indicators:"
+                    draw.text((margin_left, height-50), indicators_text, fill='blue', font=text_font)
+                    
+                    # List the indicators
+                    for i, trace in enumerate(indicator_traces):
+                        indicator_name = trace.name if hasattr(trace, 'name') else f"Indicator {i+1}"
+                        indicator_color = trace.line.color if hasattr(trace, 'line') and hasattr(trace.line, 'color') else 'blue'
+                        draw.text((margin_left + 10, height-35 + i*12), f"• {indicator_name}", fill=indicator_color, font=text_font)
+                        
+                        # Draw a simple line representation of the indicator
+                        if hasattr(trace, 'y') and len(trace.y) > 0:
+                            try:
+                                # Get indicator values and normalize them
+                                indicator_values = [v for v in trace.y if not pd.isna(v)]
+                                if len(indicator_values) > 1:
+                                    # Draw simplified indicator line
+                                    prev_x = None
+                                    prev_y = None
+                                    for j, value in enumerate(indicator_values[-min(50, len(indicator_values)):]):  # Show last 50 points
+                                        x = margin_left + (j * chart_width // min(50, len(indicator_values)))
+                                        y = margin_top + chart_height - int(((value - min_price) / price_range) * chart_height)
+                                        
+                                        if prev_x is not None and prev_y is not None:
+                                            draw.line([(prev_x, prev_y), (x, y)], fill=indicator_color, width=2)
+                                        
+                                        prev_x = x
+                                        prev_y = y
+                            except Exception as e:
+                                logger.debug(f"Could not draw indicator line for {indicator_name}: {e}")
             
             else:
                 # No candlestick data found, create a simple placeholder
