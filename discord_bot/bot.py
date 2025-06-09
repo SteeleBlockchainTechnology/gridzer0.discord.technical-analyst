@@ -101,15 +101,11 @@ bot = TechnicalAnalysisBot()
 # ANALYZE COMMAND
 @bot.tree.command(name="analyze", description="Analyze stocks or cryptocurrencies with technical indicators")
 @app_commands.describe(
-    tickers="Comma-separated ticker symbols (e.g., 'AAPL,GOOGL' or 'BTC,ETH')",
-    start_date="Start date in YYYY-MM-DD format (e.g., '2023-01-01')",
-    end_date="End date in YYYY-MM-DD format (e.g., '2023-12-31')"
+    tickers="Comma-separated ticker symbols (e.g., 'AAPL,GOOGL' or 'BTC,ETH')"
 )
 async def analyze_command(
     interaction: discord.Interaction,
-    tickers: str,
-    start_date: str = None,
-    end_date: str = None
+    tickers: str
 ):
     """Analyze stocks or cryptocurrencies with technical indicators."""
     
@@ -124,28 +120,6 @@ async def analyze_command(
                 ephemeral=True
             )
             return
-        
-        # Parse dates
-        if start_date:
-            parsed_start_date = parse_date_string(start_date)
-            if not parsed_start_date:
-                await interaction.response.send_message(
-                    "❌ **Error**: Invalid start date format. Please use YYYY-MM-DD format.",
-                    ephemeral=True                )
-                return
-        else:
-            parsed_start_date = datetime.now() - timedelta(days=settings.DEFAULT_LOOKBACK_DAYS)
-        
-        if end_date:
-            parsed_end_date = parse_date_string(end_date)
-            if not parsed_end_date:
-                await interaction.response.send_message(
-                    "❌ **Error**: Invalid end date format. Please use YYYY-MM-DD format.",
-                    ephemeral=True
-                )
-                return
-        else:
-            parsed_end_date = datetime.now()
         
         # Create callback function for analysis
         async def run_analysis(analysis_interaction, tickers, start_date, end_date, indicators):
@@ -263,15 +237,12 @@ async def analyze_command(
             except Exception as e:
                 logger.error(f"Error in analysis: {e}")
                 await analysis_interaction.followup.send(
-                    f"An error occurred during analysis: {str(e)[:500]}", ephemeral=True
-                )
+                    f"An error occurred during analysis: {str(e)[:500]}", ephemeral=True                )
         
-        # Show indicator selection interface
-        embed = create_indicator_selection_embed(ticker_list, parsed_start_date, parsed_end_date)
+        # Show indicator and date selection interface
+        embed = create_indicator_selection_embed(ticker_list)
         view = IndicatorSelectView(
             tickers=ticker_list,
-            start_date=parsed_start_date,
-            end_date=parsed_end_date,
             callback=run_analysis
         )
         
