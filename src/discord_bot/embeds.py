@@ -84,7 +84,7 @@ def create_summary_embed(
     return embed
 
 def create_help_embed() -> discord.Embed:
-    """Create a help embed for the bot."""
+    """Create a help embed for the bot."""    
     embed = discord.Embed(
         title="Technical Analysis Bot Help",
         description="Interactive Discord bot for technical analysis of stocks and cryptocurrencies.",
@@ -94,17 +94,16 @@ def create_help_embed() -> discord.Embed:
     embed.add_field(
         name="/analyze Command",
         value="""
-        **Usage:** `/analyze tickers:AAPL,GOOGL start_date:2024-01-01`
+        **Usage:** `/analyze tickers:AAPL,GOOGL`
         
         **Parameters:**
         • `tickers` (required) - Comma-separated symbols (e.g., AAPL,GOOGL,BTC)
-        • `start_date` (optional) - Start date (YYYY-MM-DD format)
-        • `end_date` (optional) - End date (YYYY-MM-DD format)
         
-        **Interactive Features:**
-        • Dropdown menu for indicator selection
-        • Multiple indicator support
+        **Interactive Setup:**
+        • Select technical indicators via buttons
+        • Set custom date range via modal
         • One-click analysis start
+        • Reset and cancel options available
         """,
         inline=False
     )
@@ -119,7 +118,6 @@ def create_help_embed() -> discord.Embed:
         """,
         inline=False
     )
-    
     embed.add_field(
         name="Tips",
         value="""
@@ -137,7 +135,7 @@ def create_help_embed() -> discord.Embed:
         value="""
         `/analyze tickers:AAPL` - Apple stock analysis
         `/analyze tickers:BTC,ETH` - Crypto comparison
-        `/analyze tickers:TSLA start_date:2024-01-01` - Custom date range
+        `/analyze tickers:TSLA` - Tesla with interactive setup
         """,
         inline=False
     )

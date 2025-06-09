@@ -48,7 +48,7 @@ class TechnicalAnalysisAgent:
         try:
             self.logger.info("Starting Discord bot mode...")
               # Import Discord bot module
-            from discord_bot.bot import create_bot
+            from src.discord_bot.bot import create_bot
             
             # Validate Discord token
             if not settings.DISCORD_TOKEN:

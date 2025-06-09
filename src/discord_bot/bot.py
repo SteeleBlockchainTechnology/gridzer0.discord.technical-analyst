@@ -30,13 +30,13 @@ class TechnicalAnalysisBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
-        
         super().__init__(
             command_prefix='!',
             intents=intents,
             help_command=None
         )
-          # Initialize services
+        
+        # Initialize services
         self.market_data_service = MarketDataService()
         self.technical_analysis_service = TechnicalAnalysisService()
         self.chart_image_service = ChartImageService()
@@ -147,15 +147,15 @@ async def analyze_command(
                         if data is None or data.empty:
                             embeds.append(create_error_embed(ticker, "No data available for this ticker."))
                             continue
-                        
-                        # Generate technical analysis
+                          # Generate technical analysis
                         logger.info(f"Generating analysis for {ticker}")
                         
                         # Create chart
                         fig = bot.technical_analysis_service.create_candlestick_chart(
                             data, ticker, indicators
                         )
-                          # Export chart as image
+                        
+                        # Export chart as image
                         img_buffer = bot.chart_image_service.export_chart_as_image(fig)
                         
                         if img_buffer:
@@ -224,8 +224,7 @@ async def analyze_command(
                         batch_files = files[i:i+10] if files else None
                         
                         await analysis_interaction.followup.send(embeds=batch_embeds, files=batch_files)
-                        
-                    # Send summary if multiple tickers
+                          # Send summary if multiple tickers
                     if len(tickers) > 1:
                         summary_embed = create_summary_embed(tickers, start_date, end_date, indicators)
                         await analysis_interaction.followup.send(embed=summary_embed)
@@ -237,13 +236,20 @@ async def analyze_command(
             except Exception as e:
                 logger.error(f"Error in analysis: {e}")
                 await analysis_interaction.followup.send(
-                    f"An error occurred during analysis: {str(e)[:500]}", ephemeral=True                )
-        
-        # Show indicator and date selection interface
-        embed = create_indicator_selection_embed(ticker_list)
+                    f"An error occurred during analysis: {str(e)[:500]}", ephemeral=True
+                )
+          # Show indicator and date selection interface
         view = IndicatorSelectView(
             tickers=ticker_list,
             callback=run_analysis
+        )
+        
+        # Create embed with default dates from the view
+        embed = create_indicator_selection_embed(
+            ticker_list,
+            view.start_date,
+            view.end_date,
+            view.selected_indicators
         )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
