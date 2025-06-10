@@ -195,15 +195,14 @@ class CryptoMarketDataService:
         except Exception as e:
             logger.error(f"Unexpected error fetching data for {coin_id}: {e}")
             return None
-    
-    def fetch_data(self, symbol: str, start_date: datetime, end_date: datetime) -> Optional[pd.DataFrame]:
+    def fetch_data(self, symbol: str, start_date, end_date) -> Optional[pd.DataFrame]:
         """
         Fetch cryptocurrency data for the given symbol and date range.
         
         Args:
             symbol: Cryptocurrency symbol (e.g., 'BTC', 'ETH')
-            start_date: Start date for data retrieval
-            end_date: End date for data retrieval
+            start_date: Start date for data retrieval (datetime.date or datetime.datetime)
+            end_date: End date for data retrieval (datetime.date or datetime.datetime)
             
         Returns:
             DataFrame with OHLCV data or None if error
@@ -215,17 +214,24 @@ class CryptoMarketDataService:
                 logger.error(f"Could not find coin ID for symbol: {symbol}")
                 return None
             
-            # Ensure dates are datetime objects
+            # Convert dates to datetime objects with proper timezone handling
             if isinstance(start_date, str):
-                start_date = datetime.strptime(start_date, "%Y-%m-%d")
-            if isinstance(end_date, str):
-                end_date = datetime.strptime(end_date, "%Y-%m-%d")
+                start_date = datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            elif hasattr(start_date, 'date'):  # datetime object
+                if start_date.tzinfo is None:
+                    start_date = start_date.replace(tzinfo=timezone.utc)
+            else:  # date object
+                start_date = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
             
-            # Add timezone info if not present
-            if start_date.tzinfo is None:
-                start_date = start_date.replace(tzinfo=timezone.utc)
-            if end_date.tzinfo is None:
-                end_date = end_date.replace(tzinfo=timezone.utc)
+            if isinstance(end_date, str):
+                end_date = datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            elif hasattr(end_date, 'date'):  # datetime object
+                if end_date.tzinfo is None:
+                    end_date = end_date.replace(tzinfo=timezone.utc)
+            else:  # date object
+                end_date = datetime.combine(end_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+            
+            logger.info(f"Processed dates: {start_date} to {end_date}")
             
             # Fetch the data
             return self._fetch_historical_data(coin_id, start_date, end_date)
