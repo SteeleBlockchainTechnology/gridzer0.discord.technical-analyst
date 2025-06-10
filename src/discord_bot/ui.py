@@ -188,12 +188,36 @@ class IndicatorSelectionView(discord.ui.View):
             # Bind the callback dynamically
             button.callback = self._create_toggle_callback(indicator, button)
             self.add_item(button)
+          # Add control buttons on the last row
+        button_row = len(indicators) // 4 + 1
         
-        # Add Done button on the last row
+        # Select All button
+        select_all_button = discord.ui.Button(
+            label="Select All",
+            style=discord.ButtonStyle.secondary,
+            row=button_row,
+            custom_id="select_all",
+            emoji="✅"
+        )
+        select_all_button.callback = self._select_all_callback
+        self.add_item(select_all_button)
+        
+        # Clear All button
+        clear_all_button = discord.ui.Button(
+            label="Clear All",
+            style=discord.ButtonStyle.secondary,
+            row=button_row,
+            custom_id="clear_all",
+            emoji="❌"
+        )
+        clear_all_button.callback = self._clear_all_callback
+        self.add_item(clear_all_button)
+        
+        # Done button
         done_button = discord.ui.Button(
             label="✓ Done",
             style=discord.ButtonStyle.primary,
-            row=len(indicators) // 4 + 1,
+            row=button_row,
             custom_id="done_selecting"
         )
         done_button.callback = self._done_selecting_callback
@@ -202,7 +226,6 @@ class IndicatorSelectionView(discord.ui.View):
     def _get_button_style(self, indicator: str) -> discord.ButtonStyle:
         """Get button style based on selection state."""
         return discord.ButtonStyle.green if indicator in self.parent_view.selected_indicators else discord.ButtonStyle.secondary
-    
     def _create_toggle_callback(self, indicator: str, button: discord.ui.Button):
         """Create a toggle callback for a specific indicator."""
         async def toggle_callback(interaction: discord.Interaction):
@@ -210,7 +233,7 @@ class IndicatorSelectionView(discord.ui.View):
         return toggle_callback
     
     async def _toggle_indicator(self, interaction: discord.Interaction, indicator: str, button: discord.ui.Button):
-        """Toggle an indicator on/off with improved feedback."""
+        """Toggle an indicator on/off with instant response."""
         try:
             is_selected = indicator in self.parent_view.selected_indicators
             
@@ -227,15 +250,101 @@ class IndicatorSelectionView(discord.ui.View):
             
             logger.info(f"Indicator {indicator} {action}. Current selection: {self.parent_view.selected_indicators}")
             
-            # Create updated embed showing current selection
-            embed = self._create_selection_embed()
-            await interaction.response.edit_message(embed=embed, view=self)
+            # Update the Done button label to show selection count
+            done_button = None
+            for item in self.children:
+                if hasattr(item, 'custom_id') and item.custom_id == "done_selecting":
+                    done_button = item
+                    break
+            
+            if done_button:
+                selected_count = len(self.parent_view.selected_indicators)
+                if selected_count > 0:
+                    done_button.label = f"✓ Done ({selected_count})"
+                    done_button.style = discord.ButtonStyle.success
+                else:
+                    done_button.label = "✓ Done"
+                    done_button.style = discord.ButtonStyle.primary
+              # Quick response - just update the view without changing the embed
+            await interaction.response.edit_message(view=self)
             
         except Exception as e:
             error_msg = f"Error toggling indicator {indicator}: {str(e)}"
             logger.error(error_msg)
             await interaction.response.send_message(
                 f"An error occurred while toggling {indicator}. Please try again.", 
+                ephemeral=True
+            )
+    
+    async def _select_all_callback(self, interaction: discord.Interaction):
+        """Select all available indicators."""
+        try:
+            # Add all indicators to selection if not already selected
+            all_indicators = list(AVAILABLE_INDICATORS.keys())
+            self.parent_view.selected_indicators = all_indicators.copy()
+            
+            logger.info(f"Selected all indicators: {self.parent_view.selected_indicators}")
+            
+            # Update all indicator button styles to green
+            for item in self.children:
+                if hasattr(item, 'custom_id') and item.custom_id.startswith('toggle_'):
+                    item.style = discord.ButtonStyle.green
+            
+            # Update the Done button to show selection count
+            done_button = None
+            for item in self.children:
+                if hasattr(item, 'custom_id') and item.custom_id == "done_selecting":
+                    done_button = item
+                    break
+            
+            if done_button:
+                selected_count = len(self.parent_view.selected_indicators)
+                done_button.label = f"✓ Done ({selected_count})"
+                done_button.style = discord.ButtonStyle.success
+            
+            # Quick response - just update the view
+            await interaction.response.edit_message(view=self)
+            
+        except Exception as e:
+            error_msg = f"Error selecting all indicators: {str(e)}"
+            logger.error(error_msg)
+            await interaction.response.send_message(
+                "An error occurred while selecting all indicators. Please try again.", 
+                ephemeral=True
+            )
+    
+    async def _clear_all_callback(self, interaction: discord.Interaction):
+        """Clear all selected indicators."""
+        try:
+            # Clear all selections
+            self.parent_view.selected_indicators = []
+            
+            logger.info("Cleared all indicator selections")
+            
+            # Update all indicator button styles to secondary
+            for item in self.children:
+                if hasattr(item, 'custom_id') and item.custom_id.startswith('toggle_'):
+                    item.style = discord.ButtonStyle.secondary
+            
+            # Update the Done button to default state
+            done_button = None
+            for item in self.children:
+                if hasattr(item, 'custom_id') and item.custom_id == "done_selecting":
+                    done_button = item
+                    break
+            
+            if done_button:
+                done_button.label = "✓ Done"
+                done_button.style = discord.ButtonStyle.primary
+            
+            # Quick response - just update the view
+            await interaction.response.edit_message(view=self)
+            
+        except Exception as e:
+            error_msg = f"Error clearing all indicators: {str(e)}"
+            logger.error(error_msg)
+            await interaction.response.send_message(
+                "An error occurred while clearing indicators. Please try again.", 
                 ephemeral=True
             )
     
@@ -261,7 +370,6 @@ class IndicatorSelectionView(discord.ui.View):
             )
             
             await interaction.response.edit_message(embed=embed, view=self.parent_view)
-            
         except Exception as e:
             error_msg = f"Error completing indicator selection: {str(e)}"
             logger.error(error_msg)
@@ -275,17 +383,25 @@ class IndicatorSelectionView(discord.ui.View):
         selected_count = len(self.parent_view.selected_indicators)
         total_count = len(AVAILABLE_INDICATORS)
         
+        # Dynamic title based on selection status
+        if selected_count == 0:
+            title = "📊 Select Technical Indicators"
+            description = "Click indicators below to start your selection"
+        else:
+            title = f"📊 Indicators Selected: {selected_count}/{total_count}"
+            description = "Continue selecting or click **✓ Done** when finished"
+        
         embed = discord.Embed(
-            title="Select Technical Indicators",
-            description=f"**Selected:** {selected_count}/{total_count} indicators",
-            color=discord.Color.blue()
+            title=title,
+            description=description,
+            color=discord.Color.blue() if selected_count > 0 else discord.Color.orange()
         )
         
         # Show currently selected indicators
         if self.parent_view.selected_indicators:
-            selected_list = "\n".join([f"✓ {ind}" for ind in self.parent_view.selected_indicators])
+            selected_list = "\n".join([f"✅ {ind}" for ind in self.parent_view.selected_indicators])
             embed.add_field(
-                name="Currently Selected",
+                name="Your Selection",
                 value=selected_list,
                 inline=True
             )
@@ -294,7 +410,7 @@ class IndicatorSelectionView(discord.ui.View):
         available_list = "\n".join([
             f"• **{ind}** - {desc}" 
             for ind, desc in AVAILABLE_INDICATORS.items()
-        ])
+        ])        
         embed.add_field(
             name="Available Indicators",
             value=available_list,
@@ -302,8 +418,8 @@ class IndicatorSelectionView(discord.ui.View):
         )
         
         embed.add_field(
-            name="Instructions",
-            value="• Click indicators to toggle selection (🟢 = selected)\n• Click **✓ Done** when finished",
+            name="Quick Selection Tips",
+            value="🔵 = Available • 🟢 = Selected • Click to toggle\n✅ **Select All** • ❌ **Clear All** • ✓ **Done** when finished",
             inline=False
         )
         
@@ -493,7 +609,6 @@ class IndicatorSelectView(discord.ui.View):
         label="Cancel", 
         style=discord.ButtonStyle.red, 
         row=1,
-        emoji="❌"
     )
     async def cancel_analysis(self, interaction: discord.Interaction, button: discord.ui.Button):
         """Cancel the analysis setup."""
@@ -686,7 +801,6 @@ def create_indicator_selection_embed(
             "2️⃣ **Set Date Range** - Choose analysis period\n"
             "3️⃣ **▶Start Analysis** - Begin technical analysis\n"
             "🔄 **Reset All** - Clear selections and start over\n"
-            "❌ **Cancel** - Exit setup"
         ),
         inline=False
     )
