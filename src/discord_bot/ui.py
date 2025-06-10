@@ -125,13 +125,13 @@ class DateRangeModal(discord.ui.Modal, title="Set Date Range"):
             self.parent_view.end_date = end_date
             
             logger.info(f"Date range updated: {start_date_str} to {end_date_str} ({date_range_days} days)")
-            
-            # Update the embed to show the new date range
+              # Update the embed to show the new date range
             embed = create_indicator_selection_embed(
                 self.parent_view.tickers,
                 self.parent_view.start_date,
                 self.parent_view.end_date, 
-                self.parent_view.selected_indicators
+                self.parent_view.selected_indicators,
+                self.parent_view.asset_type
             )
             
             await interaction.response.edit_message(embed=embed, view=self.parent_view)
@@ -150,6 +150,107 @@ class DateRangeModal(discord.ui.Modal, title="Set Date Range"):
         try:
             await interaction.response.send_message(
                 "An error occurred while processing your date input. Please try again.", 
+                ephemeral=True
+            )
+        except:            # In case interaction was already responded to
+            pass
+
+
+class TickerInputModal(discord.ui.Modal, title="Enter Ticker Symbols"):
+    """Modal for inputting ticker symbols."""
+    
+    def __init__(self, parent_view):
+        super().__init__()
+        self.parent_view = parent_view
+        
+        # Customize placeholder and examples based on asset type
+        if self.parent_view.asset_type == "crypto":
+            placeholder_text = "Enter crypto symbols separated by commas (e.g., BTC,ETH,ADA,SOL)"
+            examples_text = "Examples: BTC, ETH, ADA, SOL, DOGE, MATIC, etc."
+        else:
+            placeholder_text = "Enter stock symbols separated by commas (e.g., AAPL,GOOGL,TSLA,MSFT)"
+            examples_text = "Examples: AAPL, GOOGL, TSLA, MSFT, AMZN, NVDA, etc."
+        
+        # Create text input for tickers
+        self.ticker_input = discord.ui.TextInput(
+            label=f"{'Cryptocurrency' if self.parent_view.asset_type == 'crypto' else 'Stock'} Symbols",
+            placeholder=placeholder_text,
+            default=", ".join(self.parent_view.tickers) if self.parent_view.tickers else "",
+            max_length=200,
+            required=True,
+            style=discord.TextStyle.short
+        )
+        
+        self.add_item(self.ticker_input)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle ticker input submission."""
+        try:
+            # Parse the ticker input
+            ticker_input = self.ticker_input.value.strip()
+            
+            if not ticker_input:
+                await interaction.response.send_message(
+                    "Please enter at least one ticker symbol.", 
+                    ephemeral=True
+                )
+                return
+            
+            # Parse comma-separated tickers
+            ticker_list = [ticker.strip().upper() for ticker in ticker_input.split(",") if ticker.strip()]
+            
+            if not ticker_list:
+                await interaction.response.send_message(
+                    "Please enter valid ticker symbols separated by commas.", 
+                    ephemeral=True
+                )
+                return
+            
+            # Validate ticker format (basic validation)
+            valid_tickers = []
+            for ticker in ticker_list:
+                # Basic validation: alphanumeric characters, length 1-10
+                if ticker.isalnum() and 1 <= len(ticker) <= 10:
+                    valid_tickers.append(ticker)
+                else:
+                    logger.warning(f"Invalid ticker format: {ticker}")
+            
+            if not valid_tickers:
+                await interaction.response.send_message(
+                    "No valid ticker symbols found. Please use alphanumeric symbols (1-10 characters).", 
+                    ephemeral=True
+                )
+                return
+            
+            # Update the parent view's tickers
+            self.parent_view.tickers = valid_tickers
+            
+            logger.info(f"Tickers updated: {valid_tickers}")
+              # Update the embed to show the new tickers
+            embed = create_indicator_selection_embed(
+                self.parent_view.tickers,
+                self.parent_view.start_date,
+                self.parent_view.end_date, 
+                self.parent_view.selected_indicators,
+                self.parent_view.asset_type
+            )
+            
+            await interaction.response.edit_message(embed=embed, view=self.parent_view)
+            
+        except Exception as e:
+            error_msg = f"Unexpected error setting tickers: {str(e)}"
+            logger.error(error_msg)
+            await interaction.response.send_message(
+                "An unexpected error occurred while setting tickers. Please try again.", 
+                ephemeral=True
+            )
+
+    async def on_error(self, interaction: discord.Interaction, error: Exception) -> None:
+        """Handle modal errors gracefully."""
+        logger.error(f"TickerInputModal error: {error}")
+        try:
+            await interaction.response.send_message(
+                "An error occurred while processing your ticker input. Please try again.", 
                 ephemeral=True
             )
         except:
@@ -360,13 +461,13 @@ class IndicatorSelectionView(discord.ui.View):
                 return
             
             logger.info(f"User completed indicator selection: {self.parent_view.selected_indicators}")
-            
-            # Update the main embed to show selected indicators
+              # Update the main embed to show selected indicators
             embed = create_indicator_selection_embed(
                 self.parent_view.tickers,
                 self.parent_view.start_date,
                 self.parent_view.end_date, 
-                self.parent_view.selected_indicators
+                self.parent_view.selected_indicators,
+                self.parent_view.asset_type
             )
             
             await interaction.response.edit_message(embed=embed, view=self.parent_view)
@@ -448,10 +549,11 @@ class IndicatorSelectView(discord.ui.View):
     Main interactive view for technical analysis setup.
     Orchestrates indicator selection, date range setting, and analysis initiation.
     """
-    def __init__(self, tickers: List[str], callback: Callable):
+    def __init__(self, tickers: List[str], callback: Callable, asset_type: str = "stock"):
         super().__init__(timeout=DEFAULT_TIMEOUT)
         self.tickers = tickers
         self.callback = callback
+        self.asset_type = asset_type  # "stock" or "crypto"
         self.selected_indicators = ["20-Day SMA"]  # Default selection for better UX
         
         # Set default date range to last year (timezone-aware)
@@ -460,9 +562,28 @@ class IndicatorSelectView(discord.ui.View):
         self.start_date: Optional[datetime] = one_year_ago
         self.end_date: Optional[datetime] = today
         self._analysis_started = False  # Prevent multiple analysis starts
-        
-        logger.info(f"Initialized with default date range: {one_year_ago.date()} to {today.date()}")
+        logger.info(f"Initialized {asset_type} analysis with default date range: {one_year_ago.date()} to {today.date()}")
     
+    @discord.ui.button(
+        label="Set Tickers", 
+        style=discord.ButtonStyle.primary, 
+        row=0,
+        emoji="💰"
+    )
+    async def set_tickers(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Open ticker input modal."""
+        try:
+            logger.info(f"Opening ticker input modal for user {interaction.user.display_name}")
+            modal = TickerInputModal(self)
+            await interaction.response.send_modal(modal)
+        except Exception as e:
+            error_msg = f"Error opening ticker input modal: {str(e)}"
+            logger.error(error_msg)
+            await interaction.response.send_message(
+                "An error occurred while opening ticker input. Please try again.", 
+                ephemeral=True
+            )
+
     @discord.ui.button(
         label="Select Indicators", 
         style=discord.ButtonStyle.secondary, 
@@ -507,9 +628,7 @@ class IndicatorSelectView(discord.ui.View):
             await interaction.response.send_message(
                 "An error occurred while opening the date selector. Please try again.", 
                 ephemeral=True
-            )
-    
-    @discord.ui.button(
+            )    @discord.ui.button(
         label="Reset All", 
         style=discord.ButtonStyle.secondary, 
         row=1,
@@ -519,7 +638,9 @@ class IndicatorSelectView(discord.ui.View):
         """Reset all selections to defaults."""
         try:
             logger.info(f"Resetting selections for user {interaction.user.display_name}")
-              # Reset to defaults
+            
+            # Reset to defaults
+            self.tickers = []  # Clear tickers
             self.selected_indicators = ["20-Day SMA"]
             
             # Reset date range to default (last year)
@@ -532,13 +653,13 @@ class IndicatorSelectView(discord.ui.View):
             # Re-enable all buttons in case they were disabled
             for item in self.children:
                 item.disabled = False
-            
-            # Update embed to show reset state
+              # Update embed to show reset state
             embed = create_indicator_selection_embed(
                 self.tickers,
                 self.start_date,
                 self.end_date, 
-                self.selected_indicators
+                self.selected_indicators,
+                self.asset_type
             )
             
             await interaction.response.edit_message(embed=embed, view=self)
@@ -629,7 +750,7 @@ class IndicatorSelectView(discord.ui.View):
                 name="Status",
                 value="You can start a new analysis anytime using `/analyze`",
                 inline=False
-            )
+            )           
             await interaction.response.edit_message(embed=embed, view=self)
             
         except Exception as e:
@@ -642,6 +763,9 @@ class IndicatorSelectView(discord.ui.View):
     
     def _validate_analysis_prerequisites(self) -> Optional[str]:
         """Validate all prerequisites for starting analysis."""
+        if not self.tickers:
+            return "Please set ticker symbols using the '💰 Set Tickers' button first!"
+        
         if not self.selected_indicators:
             return "Please select at least one technical indicator using the '📊 Select Indicators' button!"
         
@@ -722,7 +846,8 @@ def create_indicator_selection_embed(
     tickers: List[str], 
     start_date: Optional[datetime] = None, 
     end_date: Optional[datetime] = None,
-    selected_indicators: Optional[List[str]] = None
+    selected_indicators: Optional[List[str]] = None,
+    asset_type: str = "stock"
 ) -> discord.Embed:
     """
     Create a comprehensive embed for the technical analysis setup interface.
@@ -732,22 +857,33 @@ def create_indicator_selection_embed(
         start_date: Analysis start date (timezone-aware)
         end_date: Analysis end date (timezone-aware)
         selected_indicators: Currently selected technical indicators
+        asset_type: Type of asset ("stock" or "crypto")
     
     Returns:
         Discord embed with setup information and instructions
-    """    # Calculate date range information
+    """
+    # Customize display based on asset type
+    asset_emoji = "₿" if asset_type == "crypto" else "📈"
+    asset_name = "Cryptocurrencies" if asset_type == "crypto" else "Stocks"
+    
+    # Handle empty tickers
+    if not tickers:
+        tickers_text = f"**{asset_emoji} {asset_name}:** ⚠️ No tickers set - click 'Set Tickers' button"
+    else:
+        tickers_text = f"**{asset_emoji} {asset_name}:** {', '.join(tickers)}"
+    
+    # Calculate date range information
     if start_date and end_date:
         date_range_days = (end_date - start_date).days
         date_range_text = f"**📅 Period:** {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')} ({date_range_days} days)"
     else:
         # This should rarely happen since we have default dates, but provide fallback
         date_range_text = "**📅 Period:** ⚠️ Error loading default range - please reset or change date range"
-    
-    # Create main embed
+      # Create main embed
     embed = discord.Embed(
-        title="📊 Technical Analysis Setup",
-        description=f"**Tickers:** {', '.join(tickers)}\n{date_range_text}",
-        color=discord.Color.blue(),
+        title=f"📊 {asset_name} Technical Analysis Setup",
+        description=f"{tickers_text}\n{date_range_text}",
+        color=discord.Color.orange() if asset_type == "crypto" else discord.Color.blue(),
         timestamp=datetime.now(timezone.utc)
     )
     
@@ -778,11 +914,12 @@ def create_indicator_selection_embed(
         )
     
     # Add setup status
+    tickers_ready = bool(tickers)
     indicators_ready = bool(selected_indicators)
     dates_ready = bool(start_date and end_date)
     
-    status_text = f"📊 Indicators: {'✅' if indicators_ready else '❌'}\n📅 Date Range: {'✅' if dates_ready else '❌'}"
-    if indicators_ready and dates_ready:
+    status_text = f"💰 Tickers: {'✅' if tickers_ready else '❌'}\n📊 Indicators: {'✅' if indicators_ready else '❌'}\n📅 Date Range: {'✅' if dates_ready else '❌'}"
+    if tickers_ready and indicators_ready and dates_ready:
         status_text += "\n🚀 Ready to analyze!"
     else:
         status_text += "\n⏳ Setup incomplete"
@@ -797,9 +934,10 @@ def create_indicator_selection_embed(
     embed.add_field(
         name="📝 Instructions",
         value=(
-            "1️⃣ **Select Indicators** - Choose technical indicators\n"
-            "2️⃣ **Set Date Range** - Choose analysis period\n"
-            "3️⃣ **▶Start Analysis** - Begin technical analysis\n"
+            "1️⃣ **Set Tickers** - Enter stock/crypto symbols to analyze\n"
+            "2️⃣ **Select Indicators** - Choose technical indicators\n"
+            "3️⃣ **Set Date Range** - Choose analysis period (optional)\n"
+            "4️⃣ **▶Start Analysis** - Begin technical analysis\n"
             "🔄 **Reset All** - Clear selections and start over\n"
         ),
         inline=False

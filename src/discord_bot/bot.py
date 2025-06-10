@@ -13,6 +13,7 @@ import io
 # Import services
 from src.config.settings import settings
 from src.services.market_data_service import MarketDataService
+from src.services.crypto_market_data_service import CryptoMarketDataService
 from src.services.technical_analysis_service import TechnicalAnalysisService
 from src.services.chart_image_service import ChartImageService
 from src.services.ai_analysis_service import AIAnalysisService
@@ -35,9 +36,9 @@ class TechnicalAnalysisBot(commands.Bot):
             intents=intents,
             help_command=None
         )
-        
-        # Initialize services
+          # Initialize services
         self.market_data_service = MarketDataService()
+        self.crypto_market_data_service = CryptoMarketDataService()
         self.technical_analysis_service = TechnicalAnalysisService()
         self.chart_image_service = ChartImageService()
         self.ai_analysis_service = AIAnalysisService()
@@ -99,28 +100,24 @@ def validate_indicators(indicators: List[str]) -> List[str]:
 # Create bot instance
 bot = TechnicalAnalysisBot()
 
-# ANALYZE COMMAND
-@bot.tree.command(name="analyze", description="Analyze stocks or cryptocurrencies with technical indicators")
-@app_commands.describe(
-    tickers="Comma-separated ticker symbols (e.g., 'AAPL,GOOGL' or 'BTC,ETH')"
-)
-async def analyze_command(
-    interaction: discord.Interaction,
-    tickers: str
-):
-    """Analyze stocks or cryptocurrencies with technical indicators."""
+# STOCK ANALYSIS COMMAND
+@bot.tree.command(name="analyze", description="Open the stock technical analysis interface")
+async def analyze_stock_command(interaction: discord.Interaction):
+    """Open the stock technical analysis setup interface."""
+    await _analyze_command_handler(interaction, "stock")
+
+# CRYPTO ANALYSIS COMMAND  
+@bot.tree.command(name="crypto", description="Open the cryptocurrency technical analysis interface")
+async def analyze_crypto_command(interaction: discord.Interaction):
+    """Open the cryptocurrency technical analysis setup interface."""
+    await _analyze_command_handler(interaction, "crypto")
+
+# SHARED ANALYSIS HANDLER
+async def _analyze_command_handler(interaction: discord.Interaction, asset_type: str):
+    """Shared handler for both stock and crypto analysis commands."""
     
     try:
-        logger.info(f"Analysis command received from {interaction.user}: tickers={tickers}")
-        
-        # Parse and validate inputs
-        ticker_list = parse_comma_separated_string(tickers)
-        if not ticker_list:
-            await interaction.response.send_message(
-                "❌ **Error**: Please provide at least one valid ticker symbol.",
-                ephemeral=True
-            )
-            return
+        logger.info(f"{asset_type.capitalize()} analysis command received from {interaction.user}")
         
         # Create callback function for analysis
         async def run_analysis(analysis_interaction, tickers, start_date, end_date, indicators):
@@ -130,17 +127,21 @@ async def analyze_command(
             
             logger.info(f"Analysis callback received indicators: {indicators}")
             logger.info(f"Analysis callback received tickers: {tickers}")
+            logger.info(f"Analysis type: {asset_type}")
             
             try:
                 embeds = []
                 files = []
                 
+                # Select the appropriate data service based on asset type
+                data_service = bot.crypto_market_data_service if asset_type == "crypto" else bot.market_data_service
+                
                 for ticker in tickers:
                     try:
                         # Fetch market data
-                        logger.info(f"Fetching data for {ticker}")
+                        logger.info(f"Fetching {asset_type} data for {ticker}")
                         data = await asyncio.to_thread(
-                            bot.market_data_service.fetch_data,
+                            data_service.fetch_data,
                             ticker, start_date.date(), end_date.date()
                         )
                         
@@ -231,31 +232,33 @@ async def analyze_command(
                 else:
                     await analysis_interaction.followup.send(
                         "No data could be processed for the provided tickers.", ephemeral=True
-                    )
-                    
+                    )                    
             except Exception as e:
                 logger.error(f"Error in analysis: {e}")
                 await analysis_interaction.followup.send(
                     f"An error occurred during analysis: {str(e)[:500]}", ephemeral=True
                 )
-          # Show indicator and date selection interface
+        
+        # Show the setup interface (no tickers initially)
         view = IndicatorSelectView(
-            tickers=ticker_list,
-            callback=run_analysis
+            tickers=[],  # Start with empty ticker list
+            callback=run_analysis,
+            asset_type=asset_type
         )
         
-        # Create embed with default dates from the view
+        # Create embed showing the setup interface
         embed = create_indicator_selection_embed(
-            ticker_list,
+            [],  # Empty ticker list initially
             view.start_date,
             view.end_date,
-            view.selected_indicators
+            view.selected_indicators,
+            asset_type
         )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         
     except Exception as e:
-        logger.error(f"Error in analyze command: {e}")
+        logger.error(f"Error in {asset_type} analyze command: {e}")
         await interaction.response.send_message(
             f"❌ An error occurred: {str(e)[:500]}", ephemeral=True
         )

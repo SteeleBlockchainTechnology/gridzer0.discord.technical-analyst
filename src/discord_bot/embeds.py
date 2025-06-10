@@ -86,30 +86,43 @@ def create_summary_embed(
 def create_help_embed() -> discord.Embed:
     """Create a help embed for the bot."""    
     embed = discord.Embed(
-        title="Technical Analysis Bot Help",
+        title="📊 Technical Analysis Bot Help",
         description="Interactive Discord bot for technical analysis of stocks and cryptocurrencies.",
-        color=discord.Color.blue()
+        color=discord.Color.green()
     )
     
     embed.add_field(
-        name="/analyze Command",
+        name="📈 Stock Analysis Commands",
         value="""
-        **Usage:** `/analyze tickers:AAPL,GOOGL`
+        **Usage:** `/analyze`
         
-        **Parameters:**
-        • `tickers` (required) - Comma-separated symbols (e.g., AAPL,GOOGL,BTC)
-        
-        **Interactive Setup:**
-        • Select technical indicators via buttons
-        • Set custom date range via modal
-        • One-click analysis start
-        • Reset and cancel options available
+        **Features:**
+        • Interactive ticker input for stocks (AAPL, GOOGL, TSLA, etc.)
+        • Technical indicator selection via buttons
+        • Custom date range setting
+        • Yahoo Finance data source
+        • AI-powered analysis insights
         """,
         inline=False
     )
     
     embed.add_field(
-        name="Available Indicators",
+        name="₿ Cryptocurrency Analysis Commands",
+        value="""
+        **Usage:** `/crypto`
+        
+        **Features:**
+        • Interactive ticker input for crypto (BTC, ETH, ADA, etc.)
+        • Same technical indicators as stocks
+        • Custom date range setting
+        • CoinGecko API data source
+        • AI-powered crypto insights
+        """,
+        inline=False
+    )
+    
+    embed.add_field(
+        name="📋 Available Technical Indicators",
         value="""
         • **20-Day SMA** - Simple Moving Average
         • **20-Day EMA** - Exponential Moving Average
@@ -118,28 +131,29 @@ def create_help_embed() -> discord.Embed:
         """,
         inline=False
     )
+    
     embed.add_field(
-        name="Tips",
+        name="💡 Usage Tips",
         value="""
-        • Use uppercase tickers (AAPL, not aapl)
+        • Choose `/analyze` for stocks, `/crypto` for cryptocurrencies
+        • Use uppercase symbols (AAPL, BTC not aapl, btc)
         • Dates must be in YYYY-MM-DD format
         • Multiple tickers: separate with commas
-        • Interactive selection: no need to type indicators!
-        • Analysis includes AI-powered insights
+        • Interactive setup - no need to memorize commands!
         """,
         inline=False
     )
     
     embed.add_field(
-        name="Quick Examples",
+        name="🚀 Quick Examples",
         value="""
-        `/analyze tickers:AAPL` - Apple stock analysis
-        `/analyze tickers:BTC,ETH` - Crypto comparison
-        `/analyze tickers:TSLA` - Tesla with interactive setup
+        **Stocks:** `/analyze` → Set tickers: AAPL,GOOGL → Select indicators
+        **Crypto:** `/crypto` → Set tickers: BTC,ETH → Select indicators
+        **Mixed analysis:** Use both commands separately
         """,
         inline=False
     )
     
-    embed.set_footer(text="For support, contact the bot administrator.")
+    embed.set_footer(text="GridZer0 Technical Analysis Bot • For support, contact the administrator")
     
     return embed
