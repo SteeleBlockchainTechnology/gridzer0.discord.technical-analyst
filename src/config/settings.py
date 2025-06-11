@@ -17,6 +17,8 @@ class Settings:
     # API Keys
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     
+    COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
+    
     # Model Settings
     MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/llama-4-maverick-17b-128e-instruct")
     
