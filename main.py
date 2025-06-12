@@ -71,60 +71,65 @@ class TechnicalAnalysisAgent:
             return False
         
         return True
-    
     def run_cli(self):
         """Run the CLI interface."""
         try:
             self.logger.info("Starting CLI mode...")
             
             from src.services.market_data_service import MarketDataService
+            from src.services.crypto_market_data_service import CryptoMarketDataService
             from src.services.technical_analysis_service import TechnicalAnalysisService
             from src.services.ai_analysis_service import AIAnalysisService
             from datetime import datetime, timedelta
             
             # Initialize services
             market_service = MarketDataService()
+            crypto_service = CryptoMarketDataService()
             tech_service = TechnicalAnalysisService()
             ai_service = AIAnalysisService()
             
             print("=" * 60)
             print("Technical Analysis Agent - CLI Mode")
             print("=" * 60)
-            
             while True:
                 print("\nAvailable commands:")
-                print("1. Analyze ticker")
-                print("2. List available indicators")
-                print("3. Exit")
-                
-                choice = input("\nEnter your choice (1-3): ").strip()
+                print("1. Analyze stock ticker")
+                print("2. Analyze cryptocurrency")
+                print("3. List available indicators")
+                print("4. Exit")
+                choice = input("\nEnter your choice (1-4): ").strip()
                 
                 if choice == "1":
-                    self._cli_analyze_ticker(market_service, tech_service, ai_service)
+                    self._cli_analyze_ticker(market_service, tech_service, ai_service, "stock")
                 elif choice == "2":
-                    self._cli_list_indicators()
+                    self._cli_analyze_ticker(crypto_service, tech_service, ai_service, "crypto")
                 elif choice == "3":
+                    self._cli_list_indicators()
+                elif choice == "4":
                     print("Goodbye!")
                     break
                 else:
-                    print("Invalid choice. Please enter 1, 2, or 3.")
+                    print("Invalid choice. Please enter 1, 2, 3, or 4.")
             
         except KeyboardInterrupt:
             print("\nGoodbye!")
         except Exception as e:
             self.logger.error(f"CLI error: {e}")
             return False
-        
         return True
     
-    def _cli_analyze_ticker(self, market_service, tech_service, ai_service):
+    def _cli_analyze_ticker(self, data_service, tech_service, ai_service, asset_type):
         """Handle ticker analysis in CLI mode."""
         try:
             # Get user inputs
-            ticker = input("Enter ticker symbol (e.g., AAPL): ").strip().upper()
+            asset_name = "stock" if asset_type == "stock" else "cryptocurrency"
+            example = "AAPL" if asset_type == "stock" else "BTC"
+            ticker = input(f"Enter {asset_name} symbol (e.g., {example}): ").strip().upper()
             if not ticker:
-                print("Ticker symbol is required.")
+                print(f"{asset_name.capitalize()} symbol is required.")
                 return
+            
+            print(f"Analyzing {ticker} as {asset_name}...")
             
             # Get date range
             days_back = input("Enter number of days back (default: 365): ").strip()
@@ -140,12 +145,11 @@ class TechnicalAnalysisAgent:
             print(f"\nAvailable indicators: {', '.join(settings.TECHNICAL_INDICATORS)}")
             indicators_input = input("Enter indicators (comma-separated, default: 20-Day SMA): ").strip()
             indicators = [ind.strip() for ind in indicators_input.split(",")] if indicators_input else ["20-Day SMA"]
-            
-            print(f"\nAnalyzing {ticker} from {start_date.date()} to {end_date.date()}...")
+            print(f"\nAnalyzing {ticker} ({asset_name}) from {start_date.date()} to {end_date.date()}...")
             print(f"Indicators: {', '.join(indicators)}")
             
             # Fetch data
-            data = market_service.fetch_data(ticker, start_date.date(), end_date.date())
+            data = data_service.fetch_data(ticker, start_date.date(), end_date.date())
             
             if data.empty:
                 print(f"No data available for {ticker}")
@@ -217,15 +221,20 @@ class TechnicalAnalysisAgent:
         self.logger.info("Validating environment...")
         
         issues = []
-        
-        # Check for required environment variables
-        required_env_vars = ['DISCORD_TOKEN', 'ALPHA_VANTAGE_API_KEY']
+          # Check for required environment variables
+        required_env_vars = ['DISCORD_TOKEN', 'GROQ_API_KEY']
         for var in required_env_vars:
             if not getattr(settings, var, None):
                 issues.append(f"Missing environment variable: {var}")
         
+        # Check for optional environment variables
+        optional_env_vars = ['COINGECKO_API_KEY']
+        for var in optional_env_vars:
+            if not getattr(settings, var, None):
+                self.logger.info(f"Optional environment variable not set: {var}")
+        
         # Check for required directories
-        required_dirs = ['src', 'discord_bot_module', 'logs']
+        required_dirs = ['src', 'logs']
         for dir_name in required_dirs:
             if not Path(dir_name).exists():
                 issues.append(f"Missing directory: {dir_name}")

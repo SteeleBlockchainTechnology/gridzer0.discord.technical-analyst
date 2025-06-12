@@ -39,12 +39,15 @@ class CryptoMarketDataService:
                 datetime.now() - self._cache_timestamp < timedelta(hours=self._cache_expiry_hours)):
                 logger.debug("Using cached coins list")
                 return True
-            
             logger.info("Loading coins list from CoinGecko API...")
             time.sleep(self.rate_limit_delay)  # Rate limiting
             
             url = f"{self.base_url}/coins/list"
             headers = {"accept": "application/json"}
+            
+            # Only add API key if available
+            if settings.COINGECKO_API_KEY:
+                headers["x-cg-demo-api-key"] = settings.COINGECKO_API_KEY
             
             response = self.session.get(url, headers=headers, timeout=30)
             response.raise_for_status()

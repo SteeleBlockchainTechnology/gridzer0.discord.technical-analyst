@@ -18,7 +18,7 @@ class Settings:
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
     
     COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")
-    
+
     # Model Settings
     MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/llama-4-maverick-17b-128e-instruct")
     
@@ -26,16 +26,13 @@ class Settings:
     LOGS_DIR = os.getenv("LOGS_DIR", "logs")
     LOG_FILE = os.path.join(LOGS_DIR, os.getenv("LOG_FILE", "technical_analysis_app.log"))
     LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
-    
-    # Application defaults
-    DEFAULT_TICKERS = ["BTC", "ETH", "ADA"]
+      # Application defaults
+    DEFAULT_TICKERS = ["AAPL", "GOOGL", "BTC", "ETH", "ADA"]
     DEFAULT_LOOKBACK_DAYS = 365
     
-    # Common cryptocurrency symbols that need the -USD suffix
-    CRYPTO_SYMBOLS = [
-        "BTC", "ETH", "LTC", "XRP", "BCH", "ADA", 
-        "DOT", "LINK", "BNB", "XLM", "DOGE", "UNI", "SOL"
-    ]
+    # Data source preferences
+    PREFERRED_CRYPTO_SOURCE = "coingecko"
+    PREFERRED_STOCK_SOURCE = "yfinance"
     
     # Technical indicator options
     TECHNICAL_INDICATORS = [

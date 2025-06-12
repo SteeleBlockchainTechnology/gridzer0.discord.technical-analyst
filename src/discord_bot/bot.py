@@ -34,9 +34,9 @@ class TechnicalAnalysisBot(commands.Bot):
         super().__init__(
             command_prefix='!',
             intents=intents,
-            help_command=None
-        )
-          # Initialize services
+            help_command=None        )
+        
+        # Initialize services
         self.market_data_service = MarketDataService()
         self.crypto_market_data_service = CryptoMarketDataService()
         self.technical_analysis_service = TechnicalAnalysisService()
@@ -144,11 +144,11 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                             data_service.fetch_data,
                             ticker, start_date.date(), end_date.date()
                         )
-                        
                         if data is None or data.empty:
                             embeds.append(create_error_embed(ticker, "No data available for this ticker."))
                             continue
-                          # Generate technical analysis
+                        
+                        # Generate technical analysis
                         logger.info(f"Generating analysis for {ticker}")
                         
                         # Create chart
@@ -216,16 +216,15 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                     except Exception as e:
                         logger.error(f"Error processing {ticker}: {e}")
                         embeds.append(create_error_embed(ticker, f"Error processing ticker: {str(e)[:500]}"))
-                
-                # Send results using followup messages
+                  # Send results using followup messages
                 if embeds:
                     # Send embeds in batches of up to 10 (Discord limit)
                     for i in range(0, len(embeds), 10):
                         batch_embeds = embeds[i:i+10]
                         batch_files = files[i:i+10] if files else None
-                        
                         await analysis_interaction.followup.send(embeds=batch_embeds, files=batch_files)
-                          # Send summary if multiple tickers
+                        
+                    # Send summary if multiple tickers
                     if len(tickers) > 1:
                         summary_embed = create_summary_embed(tickers, start_date, end_date, indicators)
                         await analysis_interaction.followup.send(embed=summary_embed)
