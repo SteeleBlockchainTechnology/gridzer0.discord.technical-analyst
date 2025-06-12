@@ -25,10 +25,18 @@ class Settings:
     # Log Settings
     LOGS_DIR = os.getenv("LOGS_DIR", "logs")
     LOG_FILE = os.path.join(LOGS_DIR, os.getenv("LOG_FILE", "technical_analysis_app.log"))
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
-      # Application defaults
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")    # Application defaults
     DEFAULT_TICKERS = ["AAPL", "GOOGL", "BTC", "ETH", "ADA"]
     DEFAULT_LOOKBACK_DAYS = 365
+    
+    # Cryptocurrency symbols (for identifying crypto vs stock tickers)
+    CRYPTO_SYMBOLS = [
+        "BTC", "ETH", "ADA", "DOT", "LINK", "LTC", "XRP", "BCH", "EOS", "XLM",
+        "BNB", "TRX", "XMR", "DASH", "ZEC", "ETC", "ATOM", "VET", "THETA", "FIL",
+        "AAVE", "UNI", "SUSHI", "COMP", "MKR", "SNX", "YFI", "CRV", "BAL", "LUNA",
+        "SOL", "AVAX", "MATIC", "ALGO", "NEAR", "ICP", "FLOW", "EGLD", "HBAR", "ONE",
+        "FTM", "SAND", "MANA", "AXS", "GALA", "ENJ", "CHZ", "BAT", "ZRX", "OMG"
+    ]
     
     # Data source preferences
     PREFERRED_CRYPTO_SOURCE = "coingecko"

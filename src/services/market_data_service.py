@@ -15,8 +15,6 @@ class MarketDataService:
     
     def __init__(self):
         """Initialize the market data service."""
-        
-        self.crypto_symbols = settings.CRYPTO_SYMBOLS
     
     def get_ticker_data(self, ticker, start_date, end_date):
         """Fetch ticker data from Yahoo Finance."""
@@ -24,9 +22,6 @@ class MarketDataService:
         try:
             # Check if this is a cryptocurrency ticker and append -USD if needed
             yf_ticker = ticker
-            if ticker in self.crypto_symbols and not ticker.endswith("-USD"):
-                yf_ticker = f"{ticker}-USD"
-                logger.info(f"Treating {ticker} as cryptocurrency: using {yf_ticker} for data fetching")
             
             logger.info(f"Downloading data for {ticker} using yfinance symbol {yf_ticker}")
             # Download data using yfinance
