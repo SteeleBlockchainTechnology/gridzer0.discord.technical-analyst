@@ -23,12 +23,12 @@ class CryptoMarketDataService:
         
         # Cache for coin mappings to avoid repeated API calls
         self._coins_cache = {}
+        self._symbol_to_coins = {}  # For handling multiple coins with same symbol
         self._cache_timestamp = None
         self._cache_expiry_hours = 24  # Refresh cache every 24 hours
         
         logger.info("CryptoMarketDataService initialized with CoinGecko API")
-        
-        # Initialize the coins cache
+          # Initialize the coins cache
         self._load_coins_list()
     
     def _load_coins_list(self) -> bool:
@@ -54,25 +54,36 @@ class CryptoMarketDataService:
             
             coins_data = response.json()
             
-            # Build symbol to coin_id mapping
+            # Build comprehensive coin mapping
             new_cache = {}
+            symbol_to_coins = {}  # For handling duplicate symbols
+            
             for coin in coins_data:
                 symbol = coin.get('symbol', '').upper()
                 coin_id = coin.get('id', '')
                 coin_name = coin.get('name', '')
+                platforms = coin.get('platforms', {})
                 
                 if symbol and coin_id:
-                    # Handle duplicate symbols by preferring more popular coins
-                    # (CoinGecko typically lists more popular coins first)
+                    coin_info = {
+                        'id': coin_id,
+                        'name': coin_name,
+                        'symbol': symbol,
+                        'platforms': platforms
+                    }
+                    
+                    # Handle duplicate symbols by keeping all matches
+                    if symbol not in symbol_to_coins:
+                        symbol_to_coins[symbol] = []
+                    symbol_to_coins[symbol].append(coin_info)
+                    
+                    # For backwards compatibility, store the first (usually most popular) match
                     if symbol not in new_cache:
-                        new_cache[symbol] = {
-                            'id': coin_id,
-                            'name': coin_name,
-                            'symbol': symbol
-                        }
+                        new_cache[symbol] = coin_info
             
-            # Update cache
+            # Store both mappings
             self._coins_cache = new_cache
+            self._symbol_to_coins = symbol_to_coins
             self._cache_timestamp = datetime.now()
             
             logger.info(f"Successfully loaded {len(self._coins_cache)} unique cryptocurrency symbols")
@@ -83,9 +94,18 @@ class CryptoMarketDataService:
         except Exception as e:
             logger.error(f"Error loading coins list from CoinGecko: {e}")
             return False
-    
-    def _get_coin_id(self, symbol: str) -> Optional[str]:
-        """Convert cryptocurrency symbol to CoinGecko coin ID."""
+    def _get_coin_id(self, symbol: str, coin_name: str = None, contract_address: str = None) -> Optional[str]:
+        """
+        Convert cryptocurrency symbol to CoinGecko coin ID with disambiguation support.
+        
+        Args:
+            symbol: Cryptocurrency symbol (e.g., 'BTC')
+            coin_name: Optional coin name for disambiguation (e.g., 'Bitcoin')
+            contract_address: Optional contract address for exact identification
+            
+        Returns:
+            CoinGecko coin ID or None if not found
+        """
         symbol_upper = symbol.upper()
         
         # Ensure we have a coins list loaded
@@ -94,10 +114,29 @@ class CryptoMarketDataService:
                 logger.error("Failed to load coins list from CoinGecko")
                 return None
         
-        # Check our cached mapping
+        # If contract address is provided, search by contract address first
+        if contract_address:
+            coin_id = self._find_coin_by_contract_address(contract_address)
+            if coin_id:
+                logger.info(f"Found coin ID '{coin_id}' for contract address '{contract_address}'")
+                return coin_id
+        
+        # If coin name is provided, search by symbol + name combination
+        if coin_name:
+            coin_id = self._find_coin_by_symbol_and_name(symbol_upper, coin_name)
+            if coin_id:
+                logger.info(f"Found coin ID '{coin_id}' for symbol '{symbol}' and name '{coin_name}'")
+                return coin_id
+        
+        # Fallback to original symbol lookup
         if symbol_upper in self._coins_cache:
             coin_id = self._coins_cache[symbol_upper]['id']
-            logger.debug(f"Found coin ID '{coin_id}' for symbol '{symbol}'")
+            coin_matches = len(self._symbol_to_coins.get(symbol_upper, []))
+            if coin_matches > 1:
+                logger.warning(f"Symbol '{symbol}' has {coin_matches} matches. Using first match: '{coin_id}'. "
+                             f"Consider providing coin name or contract address for precise identification.")
+            else:
+                logger.debug(f"Found coin ID '{coin_id}' for symbol '{symbol}'")
             return coin_id
         
         # If not found in cache, try to refresh cache and search again
@@ -109,6 +148,48 @@ class CryptoMarketDataService:
         
         logger.warning(f"No coin ID found for cryptocurrency symbol: {symbol}")
         return None
+    
+    def _find_coin_by_contract_address(self, contract_address: str) -> Optional[str]:
+        """Find coin ID by contract address."""
+        if not hasattr(self, '_symbol_to_coins'):
+            return None
+            
+        for symbol_coins in self._symbol_to_coins.values():
+            for coin in symbol_coins:
+                platforms = coin.get('platforms', {})
+                for platform, address in platforms.items():
+                    if address.lower() == contract_address.lower():
+                        logger.debug(f"Found coin '{coin['id']}' by contract address '{contract_address}' on {platform}")
+                        return coin['id']
+        return None
+    
+    def _find_coin_by_symbol_and_name(self, symbol: str, coin_name: str) -> Optional[str]:
+        """Find coin ID by symbol and name combination."""
+        if not hasattr(self, '_symbol_to_coins'):
+            return None
+            
+        symbol_coins = self._symbol_to_coins.get(symbol, [])
+        coin_name_lower = coin_name.lower()
+        
+        # Try exact name match first
+        for coin in symbol_coins:
+            if coin['name'].lower() == coin_name_lower:
+                logger.debug(f"Found exact name match: '{coin['id']}' for '{symbol}' + '{coin_name}'")
+                return coin['id']
+        
+        # Try partial name match
+        for coin in symbol_coins:
+            if coin_name_lower in coin['name'].lower() or coin['name'].lower() in coin_name_lower:
+                logger.debug(f"Found partial name match: '{coin['id']}' for '{symbol}' + '{coin_name}'")
+                return coin['id']
+        
+        return None
+    
+    def get_symbol_matches(self, symbol: str) -> List[Dict[str, str]]:
+        """Get all coins that match a given symbol."""
+        if not hasattr(self, '_symbol_to_coins'):
+            return []
+        return self._symbol_to_coins.get(symbol.upper(), [])
     
     def get_supported_symbols(self) -> List[str]:
         """Get list of supported cryptocurrency symbols."""
@@ -244,7 +325,7 @@ class CryptoMarketDataService:
             return df
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"HTTP error fetching data for {coin_id}: {e}")
+            logger.error(f"HTTP error fetching data for {coin_id}: {e}")            
             return None
         except KeyError as e:
             logger.error(f"Data format error for {coin_id}: {e}")
@@ -253,7 +334,8 @@ class CryptoMarketDataService:
             logger.error(f"Unexpected error fetching data for {coin_id}: {e}")
             return None
     
-    def fetch_data(self, symbol: str, start_date, end_date) -> Optional[pd.DataFrame]:
+    def fetch_data(self, symbol: str, start_date, end_date, 
+                   coin_name: str = None, contract_address: str = None) -> Optional[pd.DataFrame]:
         """
         Fetch cryptocurrency data for the given symbol and date range.
         
@@ -261,15 +343,33 @@ class CryptoMarketDataService:
             symbol: Cryptocurrency symbol (e.g., 'BTC', 'ETH')
             start_date: Start date for data retrieval (datetime.date or datetime.datetime)
             end_date: End date for data retrieval (datetime.date or datetime.datetime)
+            coin_name: Optional coin name for disambiguation (e.g., 'Bitcoin')
+            contract_address: Optional contract address for exact identification
             
         Returns:
             DataFrame with OHLCV data or None if error
         """
         try:
-            # Get coin ID from symbol
-            coin_id = self._get_coin_id(symbol)
+            # Get coin ID from symbol with disambiguation support
+            coin_id = self._get_coin_id(symbol, coin_name, contract_address)
             if not coin_id:
-                logger.error(f"Could not find coin ID for symbol: {symbol}")
+                # If disambiguation info was provided, show helpful error message
+                if coin_name or contract_address:
+                    logger.error(f"Could not find coin ID for symbol: {symbol} "
+                               f"(name: {coin_name}, contract: {contract_address})")
+                    # Show available matches for this symbol
+                    matches = self.get_symbol_matches(symbol)
+                    if matches:
+                        options_list = [f"{m['name']} (ID: {m['id']})" for m in matches[:5]]
+                        logger.info(f"Available options for {symbol}: {options_list}")
+                else:
+                    logger.error(f"Could not find coin ID for symbol: {symbol}")
+                    # Show available matches for this symbol
+                    matches = self.get_symbol_matches(symbol)
+                    if matches:
+                        options_list = [f"{m['name']} (ID: {m['id']})" for m in matches[:5]]
+                        logger.info(f"Multiple coins found for {symbol}. Consider providing coin name. "
+                                  f"Options: {options_list}")
                 return None
             
             # Convert dates to datetime objects with proper timezone handling

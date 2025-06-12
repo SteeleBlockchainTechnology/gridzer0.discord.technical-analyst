@@ -182,6 +182,27 @@ class TickerInputModal(discord.ui.Modal, title="Enter Ticker Symbols"):
         )
         
         self.add_item(self.ticker_input)
+          # Add additional fields for cryptocurrency disambiguation
+        if self.parent_view.asset_type == "crypto":
+            self.coin_names_input = discord.ui.TextInput(
+                label="Coin Names (Optional - for disambiguation)",
+                placeholder="e.g., Bitcoin, Ethereum, Cardano (order should match symbols above)",
+                default="",
+                max_length=300,
+                required=False,
+                style=discord.TextStyle.short
+            )
+            
+            self.contract_addresses_input = discord.ui.TextInput(
+                label="Contract Addresses (Optional - most precise)",
+                placeholder="Enter contract addresses separated by commas for exact coin identification",
+                default="",
+                max_length=500,
+                required=False,
+                style=discord.TextStyle.paragraph
+            )            
+            self.add_item(self.coin_names_input)
+            self.add_item(self.contract_addresses_input)
     
     async def on_submit(self, interaction: discord.Interaction):
         """Handle ticker input submission."""
@@ -205,6 +226,27 @@ class TickerInputModal(discord.ui.Modal, title="Enter Ticker Symbols"):
                     ephemeral=True
                 )
                 return
+            
+            # For crypto, handle additional disambiguation fields
+            if self.parent_view.asset_type == "crypto":
+                coin_names = []
+                contract_addresses = []
+                
+                # Parse coin names if provided
+                if hasattr(self, 'coin_names_input') and self.coin_names_input.value.strip():
+                    coin_names = [name.strip() for name in self.coin_names_input.value.split(",") if name.strip()]
+                
+                # Parse contract addresses if provided
+                if hasattr(self, 'contract_addresses_input') and self.contract_addresses_input.value.strip():
+                    contract_addresses = [addr.strip() for addr in self.contract_addresses_input.value.split(",") if addr.strip()]
+                
+                # Store the disambiguation data for later use in the crypto service
+                self.parent_view.crypto_disambiguation = {
+                    'coin_names': coin_names,
+                    'contract_addresses': contract_addresses
+                }
+                
+                logger.info(f"Crypto disambiguation data: {self.parent_view.crypto_disambiguation}")
             
             # Validate ticker format (basic validation)
             valid_tickers = []
@@ -549,12 +591,19 @@ class IndicatorSelectView(discord.ui.View):
     Main interactive view for technical analysis setup.
     Orchestrates indicator selection, date range setting, and analysis initiation.
     """
+    
     def __init__(self, tickers: List[str], callback: Callable, asset_type: str = "stock"):
         super().__init__(timeout=DEFAULT_TIMEOUT)
         self.tickers = tickers
         self.callback = callback
         self.asset_type = asset_type  # "stock" or "crypto"
         self.selected_indicators = ["20-Day SMA"]  # Default selection for better UX
+        
+        # Initialize crypto disambiguation data for enhanced crypto symbol lookup
+        self.crypto_disambiguation = {
+            'coin_names': [],
+            'contract_addresses': []
+        }
         
         # Set default date range to last year (timezone-aware)
         today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -709,9 +758,8 @@ class IndicatorSelectView(discord.ui.View):
             # Update message to show analysis is starting
             embed = self._create_analysis_starting_embed()
             await interaction.edit_original_response(embed=embed, view=self)
-            
-            # Execute the analysis callback
-            await self.callback(interaction, self.tickers, self.start_date, self.end_date, self.selected_indicators)
+              # Execute the analysis callback
+            await self.callback(interaction, self.tickers, self.start_date, self.end_date, self.selected_indicators, self)
             
         except Exception as e:
             self._analysis_started = False  # Reset flag on error
@@ -929,17 +977,22 @@ def create_indicator_selection_embed(
         value=status_text,
         inline=True
     )
+      # Add instructions
+    instructions_base = (
+        "1️⃣ **Set Tickers** - Enter stock/crypto symbols to analyze\n"
+        "2️⃣ **Select Indicators** - Choose technical indicators\n"
+        "3️⃣ **Set Date Range** - Choose analysis period (optional)\n"
+        "4️⃣ **▶Start Analysis** - Begin technical analysis\n"
+        "🔄 **Reset All** - Clear selections and start over\n"
+    )
     
-    # Add instructions
+    # Add crypto-specific disambiguation note
+    if asset_type == "crypto":
+        instructions_base += "\n💡 **Crypto Tip:** If a symbol has multiple coins (like BTC), you can provide the coin name or contract address for precise identification."
+    
     embed.add_field(
         name="📝 Instructions",
-        value=(
-            "1️⃣ **Set Tickers** - Enter stock/crypto symbols to analyze\n"
-            "2️⃣ **Select Indicators** - Choose technical indicators\n"
-            "3️⃣ **Set Date Range** - Choose analysis period (optional)\n"
-            "4️⃣ **▶Start Analysis** - Begin technical analysis\n"
-            "🔄 **Reset All** - Clear selections and start over\n"
-        ),
+        value=instructions_base,
         inline=False
     )
     

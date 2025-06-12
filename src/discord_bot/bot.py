@@ -118,9 +118,8 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
     
     try:
         logger.info(f"{asset_type.capitalize()} analysis command received from {interaction.user}")
-        
-        # Create callback function for analysis
-        async def run_analysis(analysis_interaction, tickers, start_date, end_date, indicators):
+          # Create callback function for analysis
+        async def run_analysis(analysis_interaction, tickers, start_date, end_date, indicators, view=None):
             """Run the actual analysis with selected indicators."""
             # The interaction has been deferred by the UI component
             # We can use followup messages to send results
@@ -140,10 +139,41 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                     try:
                         # Fetch market data
                         logger.info(f"Fetching {asset_type} data for {ticker}")
-                        data = await asyncio.to_thread(
-                            data_service.fetch_data,
-                            ticker, start_date.date(), end_date.date()
-                        )
+                        
+                        # For crypto, use disambiguation data if available
+                        if asset_type == "crypto" and view and hasattr(view, 'crypto_disambiguation'):
+                            # Get the corresponding disambiguation data for this ticker
+                            ticker_index = tickers.index(ticker)
+                            coin_name = None
+                            contract_address = None
+                            
+                            crypto_disambiguation = view.crypto_disambiguation
+                            
+                            if crypto_disambiguation.get('coin_names') and ticker_index < len(crypto_disambiguation['coin_names']):
+                                coin_name = crypto_disambiguation['coin_names'][ticker_index]
+                                if coin_name:  # Only use non-empty names
+                                    coin_name = coin_name.strip()
+                            
+                            if crypto_disambiguation.get('contract_addresses') and ticker_index < len(crypto_disambiguation['contract_addresses']):
+                                contract_address = crypto_disambiguation['contract_addresses'][ticker_index]
+                                if contract_address:  # Only use non-empty addresses
+                                    contract_address = contract_address.strip()
+                            
+                            logger.info(f"Using disambiguation for {ticker}: name='{coin_name}', contract='{contract_address}'")
+                            
+                            # Call crypto service with disambiguation
+                            data = await asyncio.to_thread(
+                                data_service.fetch_data,
+                                ticker, start_date.date(), end_date.date(),
+                                coin_name, contract_address
+                            )
+                        else:
+                            # Standard call for stocks or crypto without disambiguation
+                            data = await asyncio.to_thread(
+                                data_service.fetch_data,
+                                ticker, start_date.date(), end_date.date()
+                            )
+                        
                         if data is None or data.empty:
                             embeds.append(create_error_embed(ticker, "No data available for this ticker."))
                             continue
