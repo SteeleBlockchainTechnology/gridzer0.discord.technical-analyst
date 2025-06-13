@@ -27,14 +27,14 @@ logger = setup_logger("DiscordBot")
 
 class TechnicalAnalysisBot(commands.Bot):
     """Main Discord bot class."""
-    
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
         super().__init__(
             command_prefix='!',
             intents=intents,
-            help_command=None        )
+            help_command=None
+        )
         
         # Initialize services
         self.market_data_service = MarketDataService()
@@ -47,6 +47,11 @@ class TechnicalAnalysisBot(commands.Bot):
         """Called when the bot is starting up."""
         logger.info("Bot is starting up...")
         try:
+            # Load admin and user command cogs
+            await self.load_extension('src.discord_bot.admin_commands')
+            await self.load_extension('src.discord_bot.user_commands')
+            logger.info("Loaded admin and user commands")
+            
             # Sync command tree
             synced = await self.tree.sync()
             logger.info(f"Synced {len(synced)} command(s)")
@@ -118,7 +123,31 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
     
     try:
         logger.info(f"{asset_type.capitalize()} analysis command received from {interaction.user}")
-          # Create callback function for analysis
+        
+        # Initialize usage tracker
+        try:
+            from src.database.usage_tracker import UsageTracker
+            usage_tracker = UsageTracker()
+        except ImportError:
+            logger.warning("Usage tracker not available")
+            usage_tracker = None
+        
+        # Check user limits before showing UI
+        user_id = str(interaction.user.id)
+        if usage_tracker:
+            limits_check = usage_tracker.check_user_limits(user_id)
+            
+            if not limits_check['within_limits']:
+                # Send limit exceeded message
+                embed = discord.Embed(
+                    title="🚫 Usage Limit Exceeded",
+                    description=_create_limit_message(limits_check),
+                    color=discord.Color.red()
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                return
+        
+        # Create callback function for analysis
         async def run_analysis(analysis_interaction, tickers, start_date, end_date, indicators, view=None):
             """Run the actual analysis with selected indicators."""
             # The interaction has been deferred by the UI component
@@ -199,13 +228,12 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                             technical_summary = bot.technical_analysis_service.generate_technical_data_summary(
                                 data, ticker, indicators
                             )
-                            
-                            # Get AI analysis
+                              # Get AI analysis
                             ai_analysis_text = "AI analysis unavailable."
                             try:
                                 ai_analysis = await asyncio.to_thread(
                                     bot.ai_analysis_service.analyze_stock_data,
-                                    data, ticker, indicators
+                                    data, ticker, indicators, user_id
                                 )
                                 
                                 if isinstance(ai_analysis, dict) and 'action' in ai_analysis:
@@ -274,8 +302,7 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
             callback=run_analysis,
             asset_type=asset_type
         )
-        
-        # Create embed showing the setup interface
+          # Create embed showing the setup interface
         embed = create_indicator_selection_embed(
             [],  # Empty ticker list initially
             view.start_date,
@@ -283,6 +310,17 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
             view.selected_indicators,
             asset_type
         )
+        
+        # Add usage warning if approaching limits
+        if usage_tracker:
+            limits_check = usage_tracker.check_user_limits(user_id)
+            usage_warning = _create_usage_warning(limits_check)
+            if usage_warning:
+                embed.add_field(
+                    name="💡 Usage Info",
+                    value=usage_warning,
+                    inline=False
+                )
         
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         
@@ -309,8 +347,35 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     
     if interaction.response.is_done():
         await interaction.followup.send(error_message, ephemeral=True)
+    else:        await interaction.response.send_message(error_message, ephemeral=True)
+
+# HELPER FUNCTIONS FOR USAGE TRACKING
+def _create_limit_message(limits_check: dict) -> str:
+    """Create limit exceeded message."""
+    if limits_check['monthly_usage'] >= limits_check['monthly_limit']:
+        return (f"You've reached your monthly AI analysis limit of ${limits_check['monthly_limit']:.2f}.\n"
+               f"Used: ${limits_check['monthly_usage']:.2f}\n\n"
+               f"Your limit will reset next month.")
+    elif limits_check['daily_usage'] >= limits_check['daily_limit']:
+        return (f"You've reached your daily AI analysis limit of ${limits_check['daily_limit']:.2f}.\n"
+               f"Used: ${limits_check['daily_usage']:.2f}\n\n"
+               f"Your limit will reset tomorrow.")
     else:
-        await interaction.response.send_message(error_message, ephemeral=True)
+        return f"You've exceeded your hourly request limit of {limits_check['hourly_limit']} requests."
+
+def _create_usage_warning(limits_check: dict) -> str:
+    """Create usage warning message."""
+    monthly_pct = limits_check['monthly_usage'] / limits_check['monthly_limit'] if limits_check['monthly_limit'] > 0 else 0
+    daily_pct = limits_check['daily_usage'] / limits_check['daily_limit'] if limits_check['daily_limit'] > 0 else 0
+    
+    if monthly_pct >= 0.8:
+        return (f"⚠️ You've used {monthly_pct:.0%} of your monthly limit "
+               f"(${limits_check['monthly_usage']:.2f}/${limits_check['monthly_limit']:.2f})")
+    elif daily_pct >= 0.8:
+        return (f"⚠️ You've used {daily_pct:.0%} of your daily limit "
+               f"(${limits_check['daily_usage']:.2f}/${limits_check['daily_limit']:.2f})")
+    
+    return None
 
 # CREATION FUNCTION
 def create_bot():

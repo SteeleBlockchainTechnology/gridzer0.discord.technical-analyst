@@ -1,6 +1,7 @@
 import groq
 import json
 import re
+from typing import Dict, List, Optional
 from ..utils.logging_utils import setup_logger
 from ..config.settings import settings
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -17,6 +18,18 @@ class AIAnalysisService:
         self.api_key = settings.GROQ_API_KEY
         self.model_name = settings.MODEL_NAME
         self.client = None
+        
+        # Initialize usage tracker
+        try:
+            from ..database.usage_tracker import UsageTracker
+            self.usage_tracker = UsageTracker()
+        except ImportError:
+            logger.warning("Usage tracker not available")
+            self.usage_tracker = None
+        
+        # Cost estimation (adjust based on actual Groq pricing)
+        self.groq_cost_per_1k_tokens = settings.GROQ_COST_PER_1K_TOKENS
+        
         self.initialize_client()
         
     def initialize_client(self):
@@ -170,12 +183,78 @@ class AIAnalysisService:
                 "action": "Error",
                 "justification": self._reformat_justification({})
             }
-    
-    def analyze_stock_data(self, data, ticker, indicators):
-        """Analyze stock data - alias for Discord bot compatibility."""
-        # Generate data description from pandas DataFrame
-        technical_summary = self._generate_data_description(data, ticker, indicators)
-        return self.analyze_market_data(ticker, technical_summary)
+    def analyze_stock_data(self, data, ticker, indicators, user_id: str = None):
+        """Analyze stock data with usage tracking and cost control."""
+        try:
+            # Check user limits before processing if user_id is provided
+            if user_id and self.usage_tracker:
+                limits_check = self.usage_tracker.check_user_limits(user_id)
+                if not limits_check['within_limits']:
+                    return self._create_limit_exceeded_message(limits_check)
+            
+            # Generate data description from pandas DataFrame
+            technical_summary = self._generate_data_description(data, ticker, indicators)
+            
+            # Estimate token usage (rough approximation)
+            prompt_tokens = len(technical_summary.split()) * 1.3  # Rough token estimation
+            
+            # Call the analysis
+            result = self.analyze_market_data(ticker, technical_summary)
+            
+            # Record usage if user_id is provided and usage tracker is available
+            if user_id and self.usage_tracker and isinstance(result, dict):
+                # Calculate token usage
+                response_text = str(result)
+                completion_tokens = len(response_text.split()) * 1.3
+                total_tokens = int(prompt_tokens + completion_tokens)
+                estimated_cost = (total_tokens / 1000) * self.groq_cost_per_1k_tokens
+                
+                # Record usage
+                self.usage_tracker.record_usage(
+                    user_id=user_id,
+                    api_service='groq',
+                    tokens_used=total_tokens,
+                    estimated_cost=estimated_cost,
+                    request_type='market_analysis',
+                    metadata={
+                        'symbol': ticker,
+                        'indicators': indicators,
+                        'prompt_tokens': int(prompt_tokens),
+                        'completion_tokens': int(completion_tokens)
+                    }
+                )
+                
+                logger.info(f"Recorded usage for user {user_id}: ${estimated_cost:.4f}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in analyze_stock_data: {e}")
+            return {
+                "action": "Error",
+                "justification": "Analysis temporarily unavailable due to technical issues."
+            }
+    def _create_limit_exceeded_message(self, limits_check: Dict[str, any]) -> str:
+        """Create a user-friendly message when limits are exceeded."""
+        if limits_check['monthly_usage'] >= limits_check['monthly_limit']:
+            return (f"🚫 **Monthly Usage Limit Reached**\n\n"
+                   f"You've used ${limits_check['monthly_usage']:.2f} of your "
+                   f"${limits_check['monthly_limit']:.2f} monthly AI analysis limit.\n\n"
+                   f"Your limit will reset next month.")
+        
+        elif limits_check['daily_usage'] >= limits_check['daily_limit']:
+            return (f"🚫 **Daily Usage Limit Reached**\n\n"
+                   f"You've used ${limits_check['daily_usage']:.2f} of your "
+                   f"${limits_check['daily_limit']:.2f} daily AI analysis limit.\n\n"
+                   f"Your limit will reset tomorrow.")
+        
+        elif limits_check['hourly_requests'] >= limits_check['hourly_limit']:
+            return (f"🚫 **Rate Limit Exceeded**\n\n"
+                   f"You've made {limits_check['hourly_requests']} requests in the last hour. "
+                   f"Please wait before making another request.\n\n"
+                   f"Limit: {limits_check['hourly_limit']} requests per hour.")
+        
+        return "🚫 **Usage limit exceeded**. Please try again later."
     
     def _generate_data_description(self, data, ticker, indicators):
         """Generate data description from pandas DataFrame for AI analysis."""

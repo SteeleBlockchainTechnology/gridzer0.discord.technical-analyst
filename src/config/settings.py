@@ -25,18 +25,10 @@ class Settings:
     # Log Settings
     LOGS_DIR = os.getenv("LOGS_DIR", "logs")
     LOG_FILE = os.path.join(LOGS_DIR, os.getenv("LOG_FILE", "technical_analysis_app.log"))
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")    # Application defaults
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")
+      # Application defaults
     DEFAULT_TICKERS = ["AAPL", "GOOGL", "BTC", "ETH", "ADA"]
     DEFAULT_LOOKBACK_DAYS = 365
-    
-    # Cryptocurrency symbols (for identifying crypto vs stock tickers)
-    CRYPTO_SYMBOLS = [
-        "BTC", "ETH", "ADA", "DOT", "LINK", "LTC", "XRP", "BCH", "EOS", "XLM",
-        "BNB", "TRX", "XMR", "DASH", "ZEC", "ETC", "ATOM", "VET", "THETA", "FIL",
-        "AAVE", "UNI", "SUSHI", "COMP", "MKR", "SNX", "YFI", "CRV", "BAL", "LUNA",
-        "SOL", "AVAX", "MATIC", "ALGO", "NEAR", "ICP", "FLOW", "EGLD", "HBAR", "ONE",
-        "FTM", "SAND", "MANA", "AXS", "GALA", "ENJ", "CHZ", "BAT", "ZRX", "OMG"
-    ]
     
     # Data source preferences
     PREFERRED_CRYPTO_SOURCE = "coingecko"
@@ -49,8 +41,7 @@ class Settings:
         "20-Day Bollinger Bands", 
         "VWAP"
     ]
-    
-    # Recommendation options
+      # Recommendation options
     RECOMMENDATION_OPTIONS = [
         "Strong Buy", 
         "Buy", 
@@ -59,7 +50,17 @@ class Settings:
         "Weak Sell", 
         "Sell", 
         "Strong Sell"
-    ]
+    ]    # Usage limits for cost control - Uniform limits for all users
+    DEFAULT_MONTHLY_LIMIT = float(os.getenv("DEFAULT_MONTHLY_LIMIT", "10.0"))  # $10 per month for all users
+    DEFAULT_DAILY_LIMIT = float(os.getenv("DEFAULT_DAILY_LIMIT", "2.0"))       # $2 per day
+    DEFAULT_HOURLY_REQUESTS = int(os.getenv("DEFAULT_HOURLY_REQUESTS", "20"))  # 20 requests per hour
+    
+    # Admin settings
+    ADMIN_USER_IDS = [id.strip() for id in os.getenv("ADMIN_USER_IDS", "").split(",") if id.strip()]
+    USAGE_ALERT_THRESHOLD = float(os.getenv("USAGE_ALERT_THRESHOLD", "0.8"))  # Alert when 80% of limit is reached
+    
+    # Cost estimation (adjust based on actual Groq pricing)
+    GROQ_COST_PER_1K_TOKENS = float(os.getenv("GROQ_COST_PER_1K_TOKENS", "0.0002"))
 
 # Create a settings instance for importing elsewhere
 settings = Settings()
