@@ -183,8 +183,9 @@ class AIAnalysisService:
                 "action": "Error",
                 "justification": self._reformat_justification({})
             }
-    def analyze_stock_data(self, data, ticker, indicators, user_id: str = None):
-        """Analyze stock data with usage tracking and cost control."""
+            
+    def analyze_stock_data(self, data, ticker, indicators, user_id: str = None, asset_type: str = "stock"):
+        """Analyze market data with usage tracking and cost control."""
         try:
             # Check user limits before processing if user_id is provided
             if user_id and self.usage_tracker:
@@ -193,7 +194,7 @@ class AIAnalysisService:
                     return self._create_limit_exceeded_message(limits_check)
             
             # Generate data description from pandas DataFrame
-            technical_summary = self._generate_data_description(data, ticker, indicators)
+            technical_summary = self._generate_data_description(data, ticker, indicators, asset_type)
             
             # Estimate token usage (rough approximation)
             prompt_tokens = len(technical_summary.split()) * 1.3  # Rough token estimation
@@ -208,8 +209,7 @@ class AIAnalysisService:
                 completion_tokens = len(response_text.split()) * 1.3
                 total_tokens = int(prompt_tokens + completion_tokens)
                 estimated_cost = (total_tokens / 1000) * self.groq_cost_per_1k_tokens
-                
-                # Record usage
+                  # Record usage
                 self.usage_tracker.record_usage(
                     user_id=user_id,
                     api_service='groq',
@@ -219,6 +219,7 @@ class AIAnalysisService:
                     metadata={
                         'symbol': ticker,
                         'indicators': indicators,
+                        'asset_type': asset_type,
                         'prompt_tokens': int(prompt_tokens),
                         'completion_tokens': int(completion_tokens)
                     }
@@ -256,14 +257,9 @@ class AIAnalysisService:
         
         return "🚫 **Usage limit exceeded**. Please try again later."
     
-    def _generate_data_description(self, data, ticker, indicators):
+    def _generate_data_description(self, data, ticker, indicators, asset_type="stock"):
         """Generate data description from pandas DataFrame for AI analysis."""
-        try:
-            from ..config.settings import settings
-            
-            # Check if this is likely a cryptocurrency
-            is_crypto = ticker in settings.CRYPTO_SYMBOLS
-            
+        try:            
             # Format large numbers with commas for readability
             current_price = data['Close'].iloc[-1]
             formatted_price = f"${current_price:,.2f}"
@@ -273,9 +269,12 @@ class AIAnalysisService:
             high_price = f"${data['High'].max():,.2f}"
             low_price = f"${data['Low'].min():,.2f}"
             
-            # Create comprehensive description
+            # Create comprehensive description based on asset type
+            asset_label = "Cryptocurrency" if asset_type == "crypto" else "Stock"
+            ticker_display = f"{ticker}-USD" if asset_type == "crypto" else ticker
+            
             data_description = f"""
-            {'Cryptocurrency' if is_crypto else 'Stock'}: {ticker}{'-USD' if is_crypto else ''}
+            {asset_label}: {ticker_display}
             Date Range: {data.index[0].strftime('%Y-%m-%d')} to {data.index[-1].strftime('%Y-%m-%d')}
             Current Price: {formatted_price}
             Price Change: {formatted_change} ({pct_change:.2f}%)

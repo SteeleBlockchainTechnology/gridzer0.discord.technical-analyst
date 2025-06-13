@@ -154,9 +154,8 @@ class TechnicalAnalysisAgent:
             if data.empty:
                 print(f"No data available for {ticker}")
                 return
-            
-            # Generate analysis
-            summary = tech_service.generate_technical_data_summary(data, ticker, indicators)
+              # Generate analysis
+            summary = tech_service.generate_technical_data_summary(data, ticker, indicators, asset_type)
             print(f"\nTechnical Analysis for {ticker}:")
             print("-" * 40)
             print(summary)

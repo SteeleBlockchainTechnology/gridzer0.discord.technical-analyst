@@ -223,17 +223,21 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                             img_buffer.seek(0)
                             discord_file = discord.File(img_buffer, filename=f"{ticker}_chart.png")
                             files.append(discord_file)
+                                  # Determine asset type based on data service used
+                            asset_type = "crypto" if data_service == bot.crypto_market_data_service else "stock"
                             
                             # Generate technical summary
                             technical_summary = bot.technical_analysis_service.generate_technical_data_summary(
-                                data, ticker, indicators
+                                data, ticker, indicators, asset_type
                             )
-                              # Get AI analysis
+                            
+                            # Get AI analysis
                             ai_analysis_text = "AI analysis unavailable."
                             try:
+                                
                                 ai_analysis = await asyncio.to_thread(
                                     bot.ai_analysis_service.analyze_stock_data,
-                                    data, ticker, indicators, user_id
+                                    data, ticker, indicators, user_id, asset_type
                                 )
                                 
                                 if isinstance(ai_analysis, dict) and 'action' in ai_analysis:
@@ -259,9 +263,12 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                             embeds.append(embed)
                             
                         else:
+                            # Determine asset type based on data service used (for fallback case)
+                            asset_type = "crypto" if data_service == bot.crypto_market_data_service else "stock"
+                            
                             # Fallback if image generation fails
                             technical_summary = bot.technical_analysis_service.generate_technical_data_summary(
-                                data, ticker, indicators
+                                data, ticker, indicators, asset_type
                             )
                             
                             embed = create_analysis_embed(
@@ -274,7 +281,8 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                     except Exception as e:
                         logger.error(f"Error processing {ticker}: {e}")
                         embeds.append(create_error_embed(ticker, f"Error processing ticker: {str(e)[:500]}"))
-                  # Send results using followup messages
+                
+                # Send results using followup messages
                 if embeds:
                     # Send embeds in batches of up to 10 (Discord limit)
                     for i in range(0, len(embeds), 10):

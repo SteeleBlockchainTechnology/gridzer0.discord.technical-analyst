@@ -169,14 +169,13 @@ class TechnicalAnalysisService:
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
                 
-        logger.debug("Finished adding all indicators")
-                
-    def generate_technical_data_summary(self, data, ticker, indicators):
+                logger.debug("Finished adding all indicators")
+    
+    def generate_technical_data_summary(self, data, ticker, indicators, asset_type="stock"):
         """Generate a text summary of technical indicators."""
         try:
-            # Check if this is likely a cryptocurrency
-            from ..config.settings import settings
-            is_crypto = ticker in settings.CRYPTO_SYMBOLS
+            # Use the passed asset_type instead of trying to detect it
+            is_crypto = asset_type == "crypto"
             
             # Format large numbers with commas for readability
             current_price = data['Close'].iloc[-1]
@@ -187,9 +186,12 @@ class TechnicalAnalysisService:
             high_price = f"${data['High'].max():,.2f}"
             low_price = f"${data['Low'].min():,.2f}"
             
-            # Create comprehensive description
+            # Create comprehensive description based on asset type
+            asset_label = "Cryptocurrency" if is_crypto else "Stock"
+            ticker_display = f"{ticker}-USD" if is_crypto else ticker
+            
             data_description = f"""
-            {'Cryptocurrency' if is_crypto else 'Stock'}: {ticker}{'-USD' if is_crypto else ''}
+            {asset_label}: {ticker_display}
             Date Range: {data.index[0].strftime('%Y-%m-%d')} to {data.index[-1].strftime('%Y-%m-%d')}
             Current Price: {formatted_price}
             Price Change: {formatted_change} ({pct_change:.2f}%)
