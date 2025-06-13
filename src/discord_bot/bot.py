@@ -222,22 +222,19 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                             # Create Discord file
                             img_buffer.seek(0)
                             discord_file = discord.File(img_buffer, filename=f"{ticker}_chart.png")
-                            files.append(discord_file)
-                                  # Determine asset type based on data service used
-                            asset_type = "crypto" if data_service == bot.crypto_market_data_service else "stock"
+                            files.append(discord_file)                            # Determine asset type based on data service used
+                            determined_asset_type = "crypto" if data_service == bot.crypto_market_data_service else "stock"
                             
                             # Generate technical summary
                             technical_summary = bot.technical_analysis_service.generate_technical_data_summary(
-                                data, ticker, indicators, asset_type
+                                data, ticker, indicators, determined_asset_type
                             )
-                            
-                            # Get AI analysis
+                              # Get AI analysis
                             ai_analysis_text = "AI analysis unavailable."
                             try:
-                                
                                 ai_analysis = await asyncio.to_thread(
                                     bot.ai_analysis_service.analyze_stock_data,
-                                    data, ticker, indicators, user_id, asset_type
+                                    data, ticker, indicators, user_id, determined_asset_type
                                 )
                                 
                                 if isinstance(ai_analysis, dict) and 'action' in ai_analysis:
@@ -264,11 +261,11 @@ async def _analyze_command_handler(interaction: discord.Interaction, asset_type:
                             
                         else:
                             # Determine asset type based on data service used (for fallback case)
-                            asset_type = "crypto" if data_service == bot.crypto_market_data_service else "stock"
+                            fallback_asset_type = "crypto" if data_service == bot.crypto_market_data_service else "stock"
                             
                             # Fallback if image generation fails
                             technical_summary = bot.technical_analysis_service.generate_technical_data_summary(
-                                data, ticker, indicators, asset_type
+                                data, ticker, indicators, fallback_asset_type
                             )
                             
                             embed = create_analysis_embed(
